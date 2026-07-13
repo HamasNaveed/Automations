@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home Renovation Lead Capture</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+            max-width: 600px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 8px;
+            box-sizing: border-box;
+        }
+        .error {
+            color: red;
+            font-size: 0.9em;
+            margin-top: 5px;
+            display: none;
+        }
+        #message {
+            margin-top: 20px;
+            padding: 10px;
+            display: none;
+        }
+        .success-message {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error-message {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        button {
+            padding: 10px 15px;
+            font-size: 1em;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Home renovation and interior design</h1>
+    
+    <form id="leadForm" novalidate>
+        <div class="form-group">
+            <label for="name">Name</label>
+            <input type="text" id="name" name="name" minlength="3" required placeholder="At least 3 characters, letters and spaces only, max 30 words">
+            <div id="nameError" class="error">Name must be at least 3 characters long, contain only letters and spaces, and be under 30 words.</div>
+        </div>
+
+        <div class="form-group">
+            <label for="email">Email</label>
+            <input type="email" id="email" name="email" required placeholder="example@domain.com">
+            <div id="emailError" class="error">Please enter a valid email address.</div>
+        </div>
+
+        <div class="form-group">
+            <label for="location">Location</label>
+            <input type="text" id="location" name="location" required placeholder="Letters, numbers, and spaces only, max 30 words">
+            <div id="locationError" class="error">Location must contain only letters, numbers, and spaces, and be under 30 words.</div>
+        </div>
+
+        <div class="form-group">
+            <label for="serviceType">Service Type</label>
+            <select id="serviceType" name="serviceType" required>
+                <option value="">-- Select Service Type --</option>
+                <option value="Full Home Renovation">Full Home Renovation</option>
+                <option value="Single Room Remodel (Kitchen, Bath, etc.)">Single Room Remodel (Kitchen, Bath, etc.)</option>
+                <option value="Interior Design/Styling Only">Interior Design/Styling Only</option>
+                <option value="Commercial Design">Commercial Design</option>
+                <option value="Other">Other</option>
+            </select>
+            <div id="serviceTypeError" class="error">Please select a service type.</div>
+        </div>
+
+        <div class="form-group">
+            <label for="budget">Estimated Budget Range</label>
+            <select id="budget" name="budget" required>
+                <option value="">-- Select Budget Range --</option>
+                <option value="Under $10k">Under $10k</option>
+                <option value="$10k–$25k">$10k–$25k</option>
+                <option value="$25k–$50k">$25k–$50k</option>
+                <option value="$50k–$100k">$50k–$100k</option>
+                <option value="$100k+">$100k+</option>
+            </select>
+            <div id="budgetError" class="error">Please select a budget range.</div>
+        </div>
+
+        <div class="form-group">
+            <label for="timeline">Desired Timeline / Start Date</label>
+            <select id="timeline" name="timeline" required>
+                <option value="">-- Select Timeline --</option>
+                <option value="Immediately">Immediately</option>
+                <option value="Next 3–6 months">Next 3–6 months</option>
+                <option value="Just planning/Gathering ideas">Just planning/Gathering ideas</option>
+            </select>
+            <div id="timelineError" class="error">Please select a timeline.</div>
+        </div>
+
+        <button type="submit">Submit Request</button>
+    </form>
+
+    <div id="message"></div>
+
+    <script>
+        document.getElementById('leadForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+
+            // Clear previous messages and error styles
+            document.querySelectorAll('.error').forEach(el => el.style.display = 'none');
+            const messageBox = document.getElementById('message');
+            messageBox.style.display = 'none';
+            messageBox.className = '';
+            messageBox.textContent = '';
+
+            const nameInput = document.getElementById('name');
+            const emailInput = document.getElementById('email');
+            const locationInput = document.getElementById('location');
+            const serviceTypeInput = document.getElementById('serviceType');
+            const budgetInput = document.getElementById('budget');
+            const timelineInput = document.getElementById('timeline');
+
+            let isValid = true;
+
+            // Helper to count words
+            function getWordCount(str) {
+                return str.trim().split(/\s+/).filter(word => word.length > 0).length;
+            }
+
+            // Name Validation (Min 3 characters, Max 30 words, letters and spaces only)
+            const nameVal = nameInput.value.trim();
+            const nameRegex = /^[a-zA-Z\s]+$/;
+            if (!nameVal || nameVal.length < 3 || !nameRegex.test(nameVal) || getWordCount(nameVal) > 30) {
+                document.getElementById('nameError').style.display = 'block';
+                isValid = false;
+            }
+
+            // Email Validation (using native validation or custom pattern)
+            // HTML input validation check
+            if (!emailInput.checkValidity() || !emailInput.value.trim()) {
+                document.getElementById('emailError').style.display = 'block';
+                isValid = false;
+            }
+
+            // Location Validation (Max 30 words, letters, numbers, and spaces only)
+            const locationVal = locationInput.value.trim();
+            const locationRegex = /^[a-zA-Z0-9\s]+$/;
+            if (!locationVal || !locationRegex.test(locationVal) || getWordCount(locationVal) > 30) {
+                document.getElementById('locationError').style.display = 'block';
+                isValid = false;
+            }
+
+            // Dropdowns Check
+            if (!serviceTypeInput.value) {
+                document.getElementById('serviceTypeError').style.display = 'block';
+                isValid = false;
+            }
+            if (!budgetInput.value) {
+                document.getElementById('budgetError').style.display = 'block';
+                isValid = false;
+            }
+            if (!timelineInput.value) {
+                document.getElementById('timelineError').style.display = 'block';
+                isValid = false;
+            }
+
+            if (!isValid) {
+                return;
+            }
+
+            // Package data into JSON
+            const payload = {
+                name: nameVal,
+                email: emailInput.value.trim(),
+                location: locationVal,
+                service_type: serviceTypeInput.value,
+                budget: budgetInput.value,
+                timeline: timelineInput.value
+            };
+
+            // Disable submit button and show loading text
+            const submitBtn = event.target.querySelector('button[type="submit"]');
+            const originalBtnText = submitBtn.textContent;
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Submitting...';
+
+            // Send POST request
+            fetch('http://127.0.0.1:8000/submit-lead', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            })
+            .then(response => {
+                if (response.ok) {
+                    return response.json();
+                } else {
+                    return response.json().then(errData => {
+                        throw new Error(errData.detail || 'Failed to submit form.');
+                    });
+                }
+            })
+            .then(data => {
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalBtnText;
+                messageBox.textContent = 'Thank you! Your submission was successful.';
+                messageBox.className = 'success-message';
+                messageBox.style.display = 'block';
+                document.getElementById('leadForm').reset();
+            })
+            .catch(error => {
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalBtnText;
+                messageBox.textContent = error.message;
+                messageBox.className = 'error-message';
+                messageBox.style.display = 'block';
+            });
+        });
+    </script>
+</body>
+</html>
