@@ -425,6 +425,20 @@
     </div>
 
     <script>
+        // Determine backend URL base dynamically
+        const API_BASE = (window.location.protocol.startsWith('http') && !['5500', '3000', '5173'].includes(window.location.port)) ? '' : 'http://localhost:8000';
+
+        const SESSION_KEY = "rag_session_id";
+
+        function getSessionId() {
+            let id = localStorage.getItem(SESSION_KEY);
+            if (!id) {
+                id = crypto.randomUUID();
+                localStorage.setItem(SESSION_KEY, id);
+            }
+            return id;
+        }
+
         // Set initial message time
         document.getElementById('initTime').textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
@@ -497,19 +511,19 @@
             showTypingIndicator();
 
             try {
-                const response = await fetch('/api/chat', {
+                const response = await fetch(API_BASE + '/api/chat', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ message: message }),
+                    body: JSON.stringify({ message: message, session_id: getSessionId() }),
                 });
 
                 const data = await response.json();
                 removeTypingIndicator();
 
                 if (response.ok) {
-                    appendMessage(data.response, false);
+                    appendMessage(data.reply, false);
                 } else {
                     appendMessage(data.detail || 'An error occurred while processing your request.', false);
                 }
@@ -527,13 +541,21 @@
 
         async function clearChat() {
             if (confirm('Are you sure you want to reset the chat conversation?')) {
+                const sessionId = getSessionId();
                 try {
-                    await fetch('/api/reset', { method: 'POST' });
-                    chatMessages.innerHTML = '';
-                    appendMessage('Chat session has been reset. How can I help you today?', false);
+                    await fetch(API_BASE + '/api/reset', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ session_id: sessionId }),
+                    });
                 } catch (error) {
                     console.error('Failed to reset session:', error);
                 }
+                localStorage.removeItem(SESSION_KEY);
+                chatMessages.innerHTML = '';
+                appendMessage('Chat session has been reset. How can I help you today?', false);
             }
         }
     </script>

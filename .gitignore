@@ -16,6 +16,8 @@ node_modules/
 # Local credentials and configuration files
 .env
 Client_Secret.json
+credentials.json
+token.json
 token_sheets_v4.pickle
 token_*.pickle
 
