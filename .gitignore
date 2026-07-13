@@ -23,6 +23,7 @@ token_*.pickle
 *.sqlite
 *.db
 celerybeat-schedule*
+chroma_db/
 
 # Excel/CSV dataset files
 dataset_crawler*
