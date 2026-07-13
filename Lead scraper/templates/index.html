@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lead Scraper & Website Crawler Control Panel</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #080710;
+            --card-bg: rgba(255, 255, 255, 0.03);
+            --border-color: rgba(255, 255, 255, 0.08);
+            --primary-color: #8b5cf6;
+            --primary-hover: #7c3aed;
+            --primary-glow: rgba(139, 92, 246, 0.25);
+            --secondary-color: #3b82f6;
+            --secondary-hover: #2563eb;
+            --secondary-glow: rgba(59, 130, 246, 0.25);
+            --text-color: #f3f4f6;
+            --text-muted: #9ca3af;
+            --terminal-bg: #030307;
+            --shadow-color: rgba(0, 0, 0, 0.5);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+            padding: 30px 20px;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* Ambient background glow */
+        body::before {
+            content: '';
+            position: absolute;
+            width: 700px;
+            height: 700px;
+            background: radial-gradient(circle, rgba(139, 92, 246, 0.12) 0%, rgba(0,0,0,0) 70%);
+            top: -250px;
+            right: -200px;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        body::after {
+            content: '';
+            position: absolute;
+            width: 700px;
+            height: 700px;
+            background: radial-gradient(circle, rgba(59, 130, 246, 0.08) 0%, rgba(0,0,0,0) 70%);
+            bottom: -250px;
+            left: -200px;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1280px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 10px;
+        }
+
+        header h1 {
+            font-size: 1.8rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #c084fc 0%, #6366f1 50%, #3b82f6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .sheet-badge {
+            background: rgba(139, 92, 246, 0.15);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            color: #d8b4fe;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .sheet-badge span {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: #a855f7;
+            border-radius: 50%;
+            box-shadow: 0 0 10px #a855f7;
+        }
+
+        /* Dashboard Grid Layout */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 1.2fr;
+            gap: 25px;
+        }
+
+        @media (max-width: 992px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: var(--card-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 25px;
+            box-shadow: 0 10px 30px var(--shadow-color);
+            transition: transform 0.3s ease, border-color 0.3s ease;
+        }
+
+        .card:hover {
+            border-color: rgba(139, 92, 246, 0.2);
+        }
+
+        .card-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 20px;
+            color: #f3f4f6;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        input {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px 16px;
+            color: var(--text-color);
+            font-size: 0.95rem;
+            font-family: inherit;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+
+        input:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px var(--primary-glow);
+            background: rgba(0, 0, 0, 0.6);
+        }
+
+        .help-text {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 5px;
+            line-height: 1.4;
+        }
+
+        .btn {
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 14px 20px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.3s ease;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn-primary {
+            background: var(--primary-color);
+            box-shadow: 0 4px 15px var(--primary-glow);
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-hover);
+            box-shadow: 0 4px 20px rgba(139, 92, 246, 0.4);
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: var(--secondary-color);
+            box-shadow: 0 4px 15px var(--secondary-glow);
+        }
+
+        .btn-secondary:hover {
+            background: var(--secondary-hover);
+            box-shadow: 0 4px 20px rgba(59, 130, 246, 0.4);
+            transform: translateY(-1px);
+        }
+
+        .btn:disabled {
+            background: #4b5563;
+            color: #9ca3af;
+            cursor: not-allowed;
+            box-shadow: none;
+            transform: none;
+        }
+
+        .divider {
+            height: 1px;
+            background: var(--border-color);
+            margin: 25px 0;
+        }
+
+        /* Terminal Window */
+        .terminal-window {
+            background: var(--terminal-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 10px 30px var(--shadow-color);
+            height: 100%;
+            min-height: 400px;
+        }
+
+        .terminal-header {
+            background: rgba(255, 255, 255, 0.04);
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .terminal-dots {
+            display: flex;
+            gap: 6px;
+        }
+
+        .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+
+        .dot-red { background: #ef4444; }
+        .dot-yellow { background: #f59e0b; }
+        .dot-green { background: #10b981; }
+
+        .terminal-title {
+            font-size: 0.8rem;
+            font-family: 'Fira Code', monospace;
+            color: var(--text-muted);
+            letter-spacing: 0.05em;
+        }
+
+        .terminal-body {
+            padding: 20px;
+            flex-grow: 1;
+            overflow-y: auto;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.85rem;
+            line-height: 1.6;
+            color: #34d399;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            height: 380px;
+        }
+
+        .log-entry {
+            white-space: pre-wrap;
+            animation: fadeIn 0.2s ease-out;
+        }
+
+        .log-info { color: #f3f4f6; }
+        .log-success { color: #34d399; font-weight: 600; }
+        .log-error { color: #f87171; }
+        .log-warn { color: #fbbf24; }
+
+        /* Error Banner */
+        .error-banner {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.25);
+            color: #f87171;
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+            display: none;
+            animation: shake 0.3s ease;
+        }
+
+        .spinner {
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            border-top: 2px solid white;
+            width: 18px;
+            height: 18px;
+            animation: spin 1s linear infinite;
+            display: none;
+        }
+
+        /* Spreadsheet Live Data Viewer */
+        .viewer-card {
+            grid-column: 1 / -1;
+        }
+
+        .viewer-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .viewer-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #f3f4f6;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .refresh-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .refresh-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .table-container {
+            width: 100%;
+            overflow-x: auto;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            background: rgba(0, 0, 0, 0.25);
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+            text-align: left;
+        }
+
+        th {
+            position: sticky;
+            top: 0;
+            background: #11101e;
+            color: var(--text-muted);
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.05em;
+            padding: 14px 18px;
+            border-bottom: 2px solid var(--border-color);
+            z-index: 2;
+        }
+
+        td {
+            padding: 12px 18px;
+            border-bottom: 1px solid var(--border-color);
+            color: #e5e7eb;
+            max-width: 250px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        tr:hover {
+            background: rgba(255, 255, 255, 0.015);
+        }
+
+        /* Badges */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+        }
+
+        .badge-success {
+            background: rgba(16, 185, 129, 0.12);
+            color: #34d399;
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+
+        .badge-failed {
+            background: rgba(239, 68, 68, 0.12);
+            color: #f87171;
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            max-width: 180px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .badge-pending {
+            background: rgba(156, 163, 175, 0.12);
+            color: #9ca3af;
+            border: 1px solid rgba(156, 163, 175, 0.2);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.2);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Empty state styling */
+        .empty-state {
+            padding: 40px;
+            text-align: center;
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(2px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+
+        /* Row scraping button styling */
+        .row-scrape-btn {
+            background: rgba(139, 92, 246, 0.15);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            color: #d8b4fe;
+            padding: 5px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.75rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .row-scrape-btn:hover {
+            background: var(--primary-color);
+            border-color: var(--primary-color);
+            color: white;
+            box-shadow: 0 0 8px var(--primary-glow);
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: #a855f7;"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+            Lead Intelligence Hub
+        </h1>
+        <div class="sheet-badge">
+            <span></span>
+            <span id="sheetNameLabel">Loading Sheet...</span>
+        </div>
+    </header>
+
+    <div class="dashboard-grid">
+        <!-- Control Panel -->
+        <div class="card">
+            <div class="card-title">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #60a5fa;"><circle cx="12" cy="12" r="10"></circle><path d="M12 8v8M8 12h8"/></svg>
+                1. Google Places Scraper
+            </div>
+            
+            <div id="errorBanner" class="error-banner"></div>
+
+            <form id="scrapeForm">
+                <div class="form-group">
+                    <label for="location">Location Query</label>
+                    <input type="text" id="location" placeholder="e.g., New York, USA" required value="New York, USA">
+                    <div class="help-text">Specify targeted city/region. Only letters, numbers, spaces, commas, periods, and hyphens.</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="searchTerms">Search Keywords</label>
+                    <input type="text" id="searchTerms" placeholder="e.g., restaurant, cafe" required value="restaurant">
+                    <div class="help-text">Comma-separated query tags to extract.</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="maxPlaces">Leads Limit</label>
+                    <input type="number" id="maxPlaces" min="1" max="100" value="1" required>
+                    <div class="help-text">Maximum business listings to extract (1-100).</div>
+                </div>
+
+                <button type="submit" id="submitBtn" class="btn btn-primary">
+                    <div id="btnSpinner" class="spinner"></div>
+                    <span id="btnText">Start Place Scrape & Export</span>
+                </button>
+            </form>
+
+            <div class="divider"></div>
+
+            <div class="card-title">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #a78bfa;"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+                2. Sheet Website Crawler
+            </div>
+            
+            <div class="help-text" style="margin-bottom: 15px;">
+                Crawls websites recorded in the spreadsheet above. Uses BeautifulSoup to scrape descriptions, titles, keywords, and H1 tags, flagging failed URLs and updating visited status.
+            </div>
+
+            <button type="button" id="crawlWebsitesBtn" class="btn btn-secondary">
+                <div id="crawlSpinner" class="spinner"></div>
+                <span id="crawlBtnText">Scrape Website Info from Sheet</span>
+            </button>
+        </div>
+
+        <!-- Terminal Logger -->
+        <div class="terminal-window">
+            <div class="terminal-header">
+                <div class="terminal-dots">
+                    <div class="dot dot-red"></div>
+                    <div class="dot dot-yellow"></div>
+                    <div class="dot dot-green"></div>
+                </div>
+                <div class="terminal-title">operations_console.log</div>
+                <div style="width: 42px;"></div>
+            </div>
+            <div id="terminalBody" class="terminal-body">
+                <div class="log-entry log-info">> Ready. Run one of the scrape tasks from the left panel.</div>
+            </div>
+        </div>
+
+        <!-- Spreadsheet Data Viewer -->
+        <div class="card viewer-card">
+            <div class="viewer-header">
+                <div class="viewer-title">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #10b981;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                    Google Sheet Live View
+                </div>
+                <button type="button" id="refreshSheetBtn" class="refresh-btn">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                    Refresh Table
+                </button>
+            </div>
+
+            <div class="table-container">
+                <table id="leadsTable">
+                    <thead>
+                        <tr id="tableHeaders">
+                            <th>Business Name</th>
+                            <th>Category</th>
+                            <th>Website</th>
+                            <th>Email</th>
+                            <th>Visited</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody">
+                        <tr>
+                            <td colspan="6" class="empty-state">Loading spreadsheet data...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const form = document.getElementById('scrapeForm');
+    const submitBtn = document.getElementById('submitBtn');
+    const btnSpinner = document.getElementById('btnSpinner');
+    const btnText = document.getElementById('btnText');
+    const errorBanner = document.getElementById('errorBanner');
+    
+    const crawlWebsitesBtn = document.getElementById('crawlWebsitesBtn');
+    const crawlSpinner = document.getElementById('crawlSpinner');
+    const crawlBtnText = document.getElementById('crawlBtnText');
+    
+    const refreshSheetBtn = document.getElementById('refreshSheetBtn');
+    const terminalBody = document.getElementById('terminalBody');
+    const sheetNameLabel = document.getElementById('sheetNameLabel');
+    const tableHeaders = document.getElementById('tableHeaders');
+    const tableBody = document.getElementById('tableBody');
+
+    // List of key columns to prioritize in default table render
+    const keyColumns = [
+        "Business Name",
+        "Website",
+        "Email",
+        "Website Visited",
+        "Failed to Open",
+        "Scraped Title",
+        "Scraped Description"
+    ];
+
+    function addLog(message, type = 'info') {
+        const entry = document.createElement('div');
+        entry.className = `log-entry log-${type}`;
+        
+        let formattedMsg = message;
+        if (message.startsWith('data: ')) {
+            formattedMsg = message.substring(6);
+        }
+        
+        entry.textContent = `> ${formattedMsg}`;
+        terminalBody.appendChild(entry);
+        terminalBody.scrollTop = terminalBody.scrollHeight;
+    }
+
+    function showError(msg) {
+        errorBanner.textContent = msg;
+        errorBanner.style.display = 'block';
+        errorBanner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function clearError() {
+        errorBanner.style.display = 'none';
+        errorBanner.textContent = '';
+    }
+
+    // Retrieve and populate Sheet Data
+    async function loadSheetData() {
+        try {
+            const response = await fetch('/get-sheet-data');
+            const data = await response.json();
+            
+            if (!response.ok) {
+                throw new Error(data.message || "Failed to load sheets data.");
+            }
+
+            sheetNameLabel.textContent = data.sheetTitle || "Sheet1";
+            
+            if (!data.headers || data.headers.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="6" class="empty-state">No headers or data found in sheet.</td></tr>`;
+                return;
+            }
+
+            // Map all headers
+            const headerIndices = {};
+            data.headers.forEach((h, idx) => {
+                headerIndices[h] = idx;
+            });
+
+            // Rebuild Table Headers using priority columns if present, fallback to raw headers
+            let displayHeaders = keyColumns.filter(c => c in headerIndices);
+            // Append any headers that aren't in keyColumns but exist in the sheet
+            data.headers.forEach(h => {
+                if (!displayHeaders.includes(h)) {
+                    displayHeaders.push(h);
+                }
+            });
+
+            // Add Actions header
+            let headerHtml = displayHeaders.map(h => `<th>${h}</th>`).join('');
+            headerHtml += `<th>Actions</th>`;
+            tableHeaders.innerHTML = headerHtml;
+
+            // Populate Rows
+            if (!data.rows || data.rows.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="${displayHeaders.length + 1}" class="empty-state">Spreadsheet contains headers but no rows.</td></tr>`;
+                return;
+            }
+
+            const scrapingStatus = data.scrapingStatus || {};
+
+            tableBody.innerHTML = data.rows.map((row, rowIdx) => {
+                const rowNum = rowIdx + 2;
+                const cells = displayHeaders.map(h => {
+                    const idx = headerIndices[h];
+                    const val = (row[idx] || '').trim();
+
+                    // Format columns with badges
+                    if (h === "Website Visited") {
+                        if (val.toLowerCase() === "yes") {
+                            return `<td><span class="badge badge-success">Yes</span></td>`;
+                        }
+                        return `<td><span class="badge badge-pending">No</span></td>`;
+                    }
+                    
+                    if (h === "Failed to Open") {
+                        if (val.startsWith("Yes")) {
+                            // Extract error message
+                            const errMatch = val.match(/\(([^)]+)\)/);
+                            const errMsg = errMatch ? errMatch[1] : "Open Error";
+                            return `<td><span class="badge badge-failed" title="${val}">${errMsg}</span></td>`;
+                        } else if (val.toLowerCase() === "no") {
+                            return `<td><span class="badge badge-success">No</span></td>`;
+                        }
+                        return `<td><span class="badge badge-pending">-</span></td>`;
+                    }
+
+                    if (h === "Website" && val) {
+                        return `<td><a href="${val.startsWith('http') ? val : 'http://' + val}" target="_blank" style="color: var(--secondary-color); text-decoration: none;">${val}</a></td>`;
+                    }
+
+                    return `<td title="${val}">${val}</td>`;
+                });
+
+                const rowStatus = scrapingStatus[String(rowNum)] || "";
+                let actionHtml = "";
+                if (rowStatus === "scraping") {
+                    actionHtml = `<td><span class="badge badge-pending" style="color: #60a5fa; border-color: rgba(96, 165, 250, 0.25);">Scraping...</span></td>`;
+                } else if (rowStatus === "completed") {
+                    actionHtml = `<td><span class="badge badge-success" style="font-size: 0.7rem; margin-right: 5px;">Done</span><button type="button" class="row-scrape-btn" style="padding: 2px 5px; font-size: 0.65rem;" onclick="scrapeRow(${rowNum})">Re-run</button></td>`;
+                } else if (rowStatus === "failed") {
+                    actionHtml = `<td><span class="badge badge-failed" style="font-size: 0.7rem; margin-right: 5px;">Fail</span><button type="button" class="row-scrape-btn" style="padding: 2px 5px; font-size: 0.65rem;" onclick="scrapeRow(${rowNum})">Retry</button></td>`;
+                } else {
+                    actionHtml = `<td>
+                        <button type="button" class="row-scrape-btn" onclick="scrapeRow(${rowNum})">
+                            Scrape
+                        </button>
+                    </td>`;
+                }
+
+                return `<tr>${cells.join('')}${actionHtml}</tr>`;
+            }).join('');
+
+        } catch (err) {
+            console.error(err);
+            tableBody.innerHTML = `<tr><td colspan="6" class="empty-state" style="color: #f87171;">Error loading data: ${err.message}</td></tr>`;
+        }
+    }
+
+    // Single Row Scraping Function
+    async function scrapeRow(rowNum) {
+        clearError();
+        addLog(`Triggered manual scrape for sheet Row ${rowNum}...`, 'info');
+        
+        // Refresh display status
+        await fetch('/scrape-row-website', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ rowNum })
+        });
+        
+        // Start streaming logs and reload table periodically
+        await loadSheetData();
+        
+        const stream = startLogStream(async () => {
+            await loadSheetData();
+        });
+    }
+
+    // Set up real-time SSE log connection
+    function startLogStream(onComplete) {
+        terminalBody.innerHTML = '';
+        const eventSource = new EventSource('/stream-logs');
+        
+        eventSource.onmessage = (event) => {
+            if (event.data === 'keep-alive') return;
+            
+            let type = 'info';
+            const logStr = event.data;
+            if (logStr.includes('Successfully') || logStr.includes('completed') || logStr.includes('Completed') || logStr.includes('updated')) {
+                type = 'success';
+            } else if (logStr.includes('Error') || logStr.includes('failed') || logStr.includes('Failed')) {
+                type = 'error';
+            } else if (logStr.includes('Skipping') || logStr.includes('already marked')) {
+                type = 'warn';
+            }
+            
+            addLog(logStr, type);
+
+            // Detect crawler or scraping completion keywords to wrap up
+            if (logStr.includes('metadata updated successfully') || logStr.includes('Web Scraping Job Complete') || logStr.includes('Script Execution Completed')) {
+                setTimeout(() => {
+                    eventSource.close();
+                    if (onComplete) onComplete(true);
+                }, 1000);
+            }
+        };
+
+        return eventSource;
+    }
+
+    // Trigger Google Places API Scraper
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        clearError();
+
+        const location = document.getElementById('location').value.trim();
+        const searchTerms = document.getElementById('searchTerms').value.trim();
+        const maxPlaces = document.getElementById('maxPlaces').value.trim();
+
+        // Basic validations
+        if (!location || !/^[a-zA-Z0-9\s,.-]+$/.test(location)) {
+            showError("Invalid Location format! Only letters, numbers, spaces, commas, periods, and hyphens are allowed.");
+            return;
+        }
+        if (!searchTerms || !/^[a-zA-Z0-9\s,.-]+$/.test(searchTerms)) {
+            showError("Invalid Search Terms! Special characters are restricted.");
+            return;
+        }
+
+        const placesNum = parseInt(maxPlaces);
+        if (isNaN(placesNum) || placesNum < 1 || placesNum > 100) {
+            showError("Number of places must be an integer between 1 and 100.");
+            return;
+        }
+
+        // Disable UI
+        submitBtn.disabled = true;
+        btnSpinner.style.display = 'block';
+        btnText.textContent = 'Scraping in Progress...';
+        crawlWebsitesBtn.disabled = true;
+
+        addLog("Initializing Google Places Scraping...", 'info');
+        const stream = startLogStream(async () => {
+            // Re-enable UI
+            submitBtn.disabled = false;
+            btnSpinner.style.display = 'none';
+            btnText.textContent = 'Start Place Scrape & Export';
+            crawlWebsitesBtn.disabled = false;
+            
+            // Refresh table
+            await loadSheetData();
+        });
+
+        try {
+            const response = await fetch('/run-scrape', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    location,
+                    searchTerms,
+                    maxPlaces: placesNum
+                })
+            });
+
+            const result = await response.json();
+            if (!response.ok || result.status !== 'success') {
+                stream.close();
+                showError(result.message || "An error occurred during execution.");
+                addLog(`Execution halted due to error: ${result.message}`, 'error');
+                
+                submitBtn.disabled = false;
+                btnSpinner.style.display = 'none';
+                btnText.textContent = 'Start Place Scrape & Export';
+                crawlWebsitesBtn.disabled = false;
+            }
+        } catch (err) {
+            stream.close();
+            showError("Failed to connect to the server.");
+            addLog("Connection lost or server error.", 'error');
+            
+            submitBtn.disabled = false;
+            btnSpinner.style.display = 'none';
+            btnText.textContent = 'Start Place Scrape & Export';
+            crawlWebsitesBtn.disabled = false;
+        }
+    });
+
+    // Trigger website content crawler on spreadsheet rows
+    crawlWebsitesBtn.addEventListener('click', async () => {
+        clearError();
+
+        // Disable UI
+        crawlWebsitesBtn.disabled = true;
+        crawlSpinner.style.display = 'block';
+        crawlBtnText.textContent = 'Crawling websites...';
+        submitBtn.disabled = true;
+
+        addLog("Initializing website scraping thread...", 'info');
+        const stream = startLogStream(async () => {
+            // Re-enable UI
+            crawlWebsitesBtn.disabled = false;
+            crawlSpinner.style.display = 'none';
+            crawlBtnText.textContent = 'Scrape Website Info from Sheet';
+            submitBtn.disabled = false;
+            
+            // Refresh table
+            await loadSheetData();
+        });
+
+        try {
+            const response = await fetch('/scrape-sheet-websites', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            const result = await response.json();
+            if (!response.ok || result.status !== 'started') {
+                stream.close();
+                showError(result.message || "An error occurred starting the scraper.");
+                addLog(`Thread startup failed: ${result.message}`, 'error');
+                
+                crawlWebsitesBtn.disabled = false;
+                crawlSpinner.style.display = 'none';
+                crawlBtnText.textContent = 'Scrape Website Info from Sheet';
+                submitBtn.disabled = false;
+            }
+        } catch (err) {
+            stream.close();
+            showError("Failed to connect to the server.");
+            addLog("Connection lost or server error.", 'error');
+            
+            crawlWebsitesBtn.disabled = false;
+            crawlSpinner.style.display = 'none';
+            crawlBtnText.textContent = 'Scrape Website Info from Sheet';
+            submitBtn.disabled = false;
+        }
+    });
+
+    // Manual Refresh Table button
+    refreshSheetBtn.addEventListener('click', async () => {
+        refreshSheetBtn.disabled = true;
+        const origContent = refreshSheetBtn.innerHTML;
+        refreshSheetBtn.innerHTML = `Refreshing...`;
+        await loadSheetData();
+        setTimeout(() => {
+            refreshSheetBtn.disabled = false;
+            refreshSheetBtn.innerHTML = origContent;
+        }, 800);
+    });
+
+    // Initial Load
+    window.addEventListener('DOMContentLoaded', () => {
+        loadSheetData();
+    });
+</script>
+</body>
+</html>
