@@ -29,6 +29,7 @@ chroma_db/
 dataset_crawler*
 *.csv
 *.xlsx
+*.pdf
 
 # IDE Settings
 .vscode/
