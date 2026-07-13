@@ -95,9 +95,18 @@ def health():
 
 if __name__ == "__main__":
     import uvicorn
+    from google_services import check_google_calendar_access, check_google_sheets_access
 
     # Load the agent (and thus the embedding model + retriever + LLM) at
     # startup rather than on the first request, so startup errors (like a
     # missing API key) surface immediately instead of on a user's first click.
+    print("Initializing RAG Agent...")
     get_agent()
+
+    print("Checking Google Services connectivity...")
+    cal_ok, cal_msg = check_google_calendar_access()
+    sheet_ok, sheet_msg = check_google_sheets_access()
+    print(f"[*] Calendar status: {cal_msg}")
+    print(f"[*] Sheets status: {sheet_msg}")
+
     uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 8000)))

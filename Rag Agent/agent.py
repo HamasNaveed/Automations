@@ -18,6 +18,7 @@ The same RagAgent class backs server.py (the web UI).
 """
 
 import asyncio
+import datetime
 import os
 import sys
 import threading
@@ -53,7 +54,15 @@ Crucial Instructions: \
 4. If the user asks if you are an AI or asks off-topic questions, respond with humor and playfulness. \
 5. If the user becomes overly pushy or demanding, politely tell them to book a meeting so you can help them better. \
 6. Use the `search_knowledge_base` tool to answer factual questions. \
-7. Use Google Calendar and Sheets tools to book meetings and record lead information seamlessly."""
+7. You do NOT reliably know today's real date on your own. Before interpreting any relative date/time \
+("tomorrow", "next Friday", "in two weeks", etc.) or calling `check_calendar_availability` / `book_meeting`, \
+ALWAYS call `get_current_datetime` first and use that as the ground truth for "today". Never propose or book \
+a meeting time that is in the past relative to that real current date/time. \
+8. Once the user has given their name, email, and confirmed a specific future date/time, call `book_meeting`. \
+It automatically checks availability, books the event, sends a confirmation email, AND records the lead's \
+name, email, and meeting details in the Google Sheet — you do not need to call `update_lead_sheet` yourself \
+for a booked meeting. Only call `update_lead_sheet` directly if a lead shares their name/email but does not \
+end up booking a meeting."""
 
 
 def _load_retriever():
@@ -92,6 +101,11 @@ class RagAgent:
                 "Always call this before answering factual questions."
             ),
         )
+        self._tool_current_datetime = FunctionTool.from_defaults(
+            fn=google_services.get_current_datetime,
+            name="get_current_datetime",
+            description="Returns the real current date and time (UTC) and weekday name. Call this before interpreting any relative date (e.g. 'tomorrow', 'next week') or booking a meeting — never guess today's date."
+        )
         self._tool_update_sheet = FunctionTool.from_defaults(
             fn=google_services.update_lead_sheet,
             name="update_lead_sheet",
@@ -113,7 +127,14 @@ class RagAgent:
             description="Cancels an existing meeting for the given email. Params: client_email."
         )
         self._agent = ReActAgent(
-            tools=[self._tool, self._tool_update_sheet, self._tool_check_availability, self._tool_book_meeting, self._tool_cancel_meeting],
+            tools=[
+                self._tool,
+                self._tool_current_datetime,
+                self._tool_update_sheet,
+                self._tool_check_availability,
+                self._tool_book_meeting,
+                self._tool_cancel_meeting,
+            ],
             llm=self._llm,
             system_prompt=SYSTEM_PROMPT,
         )
@@ -154,7 +175,14 @@ class RagAgent:
         correctly.
         """
         ctx = self._get_context(session_id)
-        response = await self._agent.run(user_msg=message, ctx=ctx)
+        now = datetime.datetime.now(datetime.timezone.utc)
+        grounded_message = (
+            f"(System note, not visible to the user: the real current date/time is "
+            f"{now.strftime('%Y-%m-%d %H:%M UTC')}, {now.strftime('%A')}. Use this as ground truth "
+            "for any relative-date reasoning or meeting booking.)\n"
+            f"{message}"
+        )
+        response = await self._agent.run(user_msg=grounded_message, ctx=ctx)
         return str(response)
 
     def reset_session(self, session_id: str) -> None:
@@ -169,7 +197,15 @@ class RagAgent:
 
 
 def main():
+    print("Initializing RAG Agent...")
     agent = RagAgent()
+
+    print("Checking Google Services connectivity...")
+    from google_services import check_google_calendar_access, check_google_sheets_access
+    cal_ok, cal_msg = check_google_calendar_access()
+    sheet_ok, sheet_msg = check_google_sheets_access()
+    print(f"[*] Calendar status: {cal_msg}")
+    print(f"[*] Sheets status: {sheet_msg}\n")
 
     if len(sys.argv) > 1:
         query = " ".join(sys.argv[1:])

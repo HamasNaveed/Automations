@@ -4,7 +4,7 @@ import os
 if __name__ == "__main__":
     print("Starting authentication flow for Google Services...")
     try:
-        creds = get_credentials()
+        creds = get_credentials(allow_interactive=True)
         if creds and creds.valid:
             print("\nSuccess! Google Services are authenticated.")
             import google_services
