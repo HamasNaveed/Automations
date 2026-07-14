@@ -398,7 +398,7 @@
         <main class="chat-messages" id="chatMessages">
             <div class="message-wrapper agent">
                 <div class="message-bubble">
-                    <p>Hello! I am your AI assistant. How can I help you today? I can answer questions about our service tiers, help you find pricing, or schedule a consultation with our experts.</p>
+                    <p>Hi, how can I help you?</p>
                     <span class="message-time" id="initTime"></span>
                 </div>
             </div>
@@ -555,7 +555,7 @@
                 }
                 localStorage.removeItem(SESSION_KEY);
                 chatMessages.innerHTML = '';
-                appendMessage('Chat session has been reset. How can I help you today?', false);
+                appendMessage('Hi, how can I help you?', false);
             }
         }
     </script>

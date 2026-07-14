@@ -9,11 +9,14 @@ Requires:
 """
 
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 import chromadb
 from llama_index.core import VectorStoreIndex, StorageContext, Document
 from llama_index.core.schema import TextNode
 from llama_index.vector_stores.chroma import ChromaVectorStore
-from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+from llama_index.embeddings.google_genai import GoogleGenAIEmbedding
 
 from chunker import CHUNKERS, chunk_file
 
@@ -22,7 +25,7 @@ CHROMA_DIR = os.path.join(os.path.dirname(__file__), "chroma_db")
 COLLECTION_NAME = "company_kb"
 
 # Free, local, no API key needed. ~130MB model, runs on CPU fine for this corpus size.
-EMBED_MODEL_NAME = "BAAI/bge-small-en-v1.5"
+EMBED_MODEL_NAME = "models/gemini-embedding-001"
 
 
 def build_nodes() -> list[TextNode]:
@@ -44,8 +47,8 @@ def build_nodes() -> list[TextNode]:
 
 
 def main():
-    print(f"Loading embedding model: {EMBED_MODEL_NAME} (first run downloads ~130MB)...")
-    embed_model = HuggingFaceEmbedding(model_name=EMBED_MODEL_NAME)
+    print(f"Loading embedding model: {EMBED_MODEL_NAME}...")
+    embed_model = GoogleGenAIEmbedding(model_name=EMBED_MODEL_NAME, api_key=os.environ.get("GEMINI_API_KEY"))
 
     nodes = build_nodes()
     print(f"Built {len(nodes)} nodes from source documents.")

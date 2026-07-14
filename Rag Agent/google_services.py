@@ -26,7 +26,7 @@ CREDENTIALS_PATH = os.path.join(BASE_DIR, "credentials.json")
 # No hardcoded fallback: a stray default here would silently write leads into
 # someone else's spreadsheet. Each deployment must point at its own sheet.
 SPREADSHEET_ID = os.getenv("SPREADSHEET_ID")
-RANGE_NAME = "Sheet1!A:E"  # Columns A-E: ID, Name, Email, Calendar ID, Meeting Date
+RANGE_NAME = "Sheet1!A:F"  # Columns A-F: ID, Name, Email, Calendar ID, Meeting Date, Address
 
 
 def _to_utc(dt: datetime.datetime) -> datetime.datetime:
@@ -100,7 +100,7 @@ def check_google_sheets_access() -> tuple[bool, str]:
         return False, f"Google Sheets API access check failed: {e}"
 
 
-def update_lead_sheet(lead_id: str, name: str, email: str, calendar_id: str, meeting_date: str) -> str:
+def update_lead_sheet(lead_id: str, name: str, email: str, calendar_id: str, meeting_date: str, address: str = "") -> str:
     """Updates the Google Sheet with lead information."""
     sheet_ok, sheet_msg = check_google_sheets_access()
     if not sheet_ok:
@@ -108,7 +108,7 @@ def update_lead_sheet(lead_id: str, name: str, email: str, calendar_id: str, mee
     try:
         creds = get_credentials(allow_interactive=False)
         service = build("sheets", "v4", credentials=creds)
-        values = [[lead_id, name, email, calendar_id, meeting_date]]
+        values = [[lead_id, name, email, calendar_id, meeting_date, address]]
         body = {"values": values}
 
         result = service.spreadsheets().values().append(
@@ -124,6 +124,7 @@ def update_lead_sheet(lead_id: str, name: str, email: str, calendar_id: str, mee
 
 def check_calendar_availability(date_time_iso: str, duration_minutes: int = 30) -> bool:
     """Checks if the user's primary calendar is free at the given ISO datetime."""
+    print("\nAgent: Let me check and verify...")
     cal_ok, cal_msg = check_google_calendar_access()
     if not cal_ok:
         raise RuntimeError(f"Google Calendar API is not available: {cal_msg}")
@@ -185,8 +186,9 @@ def get_existing_meeting(client_email: str) -> str:
         raise RuntimeError(f"Error checking existing meetings: {e}")
 
 
-def book_meeting(client_name: str, client_email: str, date_time_iso: str) -> str:
+def book_meeting(client_name: str, client_email: str, date_time_iso: str, client_address: str = "") -> str:
     """Books a meeting if available and none exists for the user."""
+    print("\nAgent: I am booking a meeting for you...")
     # Before using API, verify calendar and sheets can be used
     cal_ok, cal_msg = check_google_calendar_access()
     if not cal_ok:
@@ -261,6 +263,7 @@ def book_meeting(client_name: str, client_email: str, date_time_iso: str) -> str
             email=client_email,
             calendar_id=event_id,
             meeting_date=date_time_iso,
+            address=client_address,
         )
 
         return f"Meeting booked successfully! Event ID: {event_id}. {sheet_status}"

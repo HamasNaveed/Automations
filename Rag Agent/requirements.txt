@@ -1,9 +1,9 @@
 chromadb
-sentence-transformers
 llama-index
 llama-index-vector-stores-chroma
-llama-index-embeddings-huggingface
-llama-index-llms-openrouter
+llama-index-embeddings-google-genai
+llama-index-llms-gemini
+llama-index-llms-groq
 python-dotenv
 fastapi
 uvicorn[standard]
