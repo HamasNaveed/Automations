@@ -52,7 +52,7 @@ CRITICAL RULES:
 2. If answering a question requires more than 2 lines of information or news, you MUST give a very brief 1-line summary and ask the user if they need the extra details or not. 
 3. Only recall/refer to previous chat history if the user's current question is related to it. If they ask about something unrelated or change the topic, ignore the history and treat it as a fresh start.
 4. Your default/initial greeting must be: "Hi, how can I help you?"
-5. Whenever you decide to call a tool, you should include a small, short sentence explaining what you are doing (e.g., say "Let me check and verify..." before searching the knowledge base, say "Let me check the calendar if our team is available at that moment..." before checking calendar availability, and "I am booking a meeting for you..." before calling book_meeting). Do not rush things.
+5. Whenever you decide to check calendar availability or book a meeting, you should include a small, short sentence explaining what you are doing (e.g., say "Let me check the calendar if our team is available at that moment..." before checking calendar availability, and "I am booking a meeting for you..." before calling book_meeting). Do not output any checking statement when searching the knowledge base. Do not rush things.
 6. To book a meeting, you MUST obtain all of the following details from the user:
    - Their name
    - Their email
@@ -142,7 +142,6 @@ class RagAgent:
 
     def _search_knowledge_base(self, query: str) -> str:
         """Look up relevant passages in the company knowledge base."""
-        print("\nAgent: Let me check and verify...")
         nodes = self._retriever.retrieve(query)
         if not nodes:
             return "No relevant information found in the knowledge base."
@@ -262,7 +261,7 @@ class RagAgent:
                 elif tool_name == "book_meeting":
                     yield {"type": "status", "text": "I am booking a meeting for you..."}
                 elif tool_name == "search_knowledge_base":
-                    yield {"type": "status", "text": "Let me check and verify..."}
+                    pass
             elif isinstance(event, AgentStream):
                 if answer_started:
                     clean_text = event.delta.replace("—", ", ").replace("--", ", ")
