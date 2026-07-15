@@ -16,9 +16,10 @@ messages, and a "New chat" button lets them start over.
 import os
 import uuid
 
+import json
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -66,20 +67,24 @@ def index():
     return FileResponse(os.path.join(STATIC_DIR, "index.html"))
 
 
-@app.post("/api/chat", response_model=ChatResponse)
+@app.post("/api/chat")
 async def chat(req: ChatRequest):
     message = req.message.strip()
     if not message:
         raise HTTPException(status_code=400, detail="message must not be empty")
 
     session_id = req.session_id or str(uuid.uuid4())
-    try:
-        reply = await get_agent().chat(session_id, message)
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Agent error: {str(e)}")
-    return ChatResponse(reply=reply, session_id=session_id)
+
+    async def event_generator():
+        try:
+            async for event in get_agent().chat_stream(session_id, message):
+                yield json.dumps(event) + "\n"
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            yield json.dumps({"type": "error", "detail": str(e)}) + "\n"
+
+    return StreamingResponse(event_generator(), media_type="application/x-ndjson")
 
 
 @app.post("/api/reset")

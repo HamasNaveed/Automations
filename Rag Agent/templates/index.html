@@ -213,6 +213,27 @@
             color: var(--text-main);
         }
 
+        .message-wrapper.status {
+            justify-content: flex-start;
+            margin: 4px 0;
+            opacity: 0.8;
+        }
+
+        .status-bubble {
+            max-width: 80%;
+            padding: 8px 14px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px dashed var(--border-color);
+            color: var(--text-muted);
+            font-style: italic;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            animation: messageSlide 0.3s ease-out;
+        }
+
         .message-bubble p {
             margin-bottom: 8px;
         }
@@ -445,14 +466,52 @@
         const chatMessages = document.getElementById('chatMessages');
         const messageInput = document.getElementById('messageInput');
 
-        function appendMessage(text, isUser) {
+        function appendMessage(text, isUser, isStatus = false) {
             const wrapper = document.createElement('div');
-            wrapper.className = `message-wrapper ${isUser ? 'user' : 'agent'}`;
+            wrapper.className = `message-wrapper ${isStatus ? 'status' : (isUser ? 'user' : 'agent')}`;
+
+            const bubble = document.createElement('div');
+            bubble.className = isStatus ? 'status-bubble' : 'message-bubble';
+
+            // Handle newline formatting
+            const paragraphs = text.split('\n').filter(p => p.trim());
+            paragraphs.forEach(p => {
+                const para = document.createElement('p');
+                para.textContent = p;
+                bubble.appendChild(para);
+            });
+
+            if (!isStatus) {
+                const time = document.createElement('span');
+                time.className = 'message-time';
+                time.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                bubble.appendChild(time);
+            }
+
+            wrapper.appendChild(bubble);
+            chatMessages.appendChild(wrapper);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        let activeAgentBubble = null;
+        let activeAgentText = '';
+
+        function createAgentPlaceholder() {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'message-wrapper agent';
 
             const bubble = document.createElement('div');
             bubble.className = 'message-bubble';
 
-            // Handle newline formatting
+            wrapper.appendChild(bubble);
+            chatMessages.appendChild(wrapper);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            return bubble;
+        }
+
+        function updateAgentBubble(bubble, text) {
+            bubble.innerHTML = '';
+            
             const paragraphs = text.split('\n').filter(p => p.trim());
             paragraphs.forEach(p => {
                 const para = document.createElement('p');
@@ -464,9 +523,7 @@
             time.className = 'message-time';
             time.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             bubble.appendChild(time);
-
-            wrapper.appendChild(bubble);
-            chatMessages.appendChild(wrapper);
+            
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
 
@@ -519,13 +576,58 @@
                     body: JSON.stringify({ message: message, session_id: getSessionId() }),
                 });
 
-                const data = await response.json();
+                if (!response.ok) {
+                    removeTypingIndicator();
+                    const errData = await response.json();
+                    appendMessage(errData.detail || 'An error occurred while processing your request.', false);
+                    return;
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                
+                let activeAgentBubble = null;
+                let activeAgentText = '';
+                
                 removeTypingIndicator();
 
-                if (response.ok) {
-                    appendMessage(data.reply, false);
-                } else {
-                    appendMessage(data.detail || 'An error occurred while processing your request.', false);
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop(); // Keep the last incomplete line in buffer
+
+                    for (const line of lines) {
+                        if (!line.trim()) continue;
+                        try {
+                            const data = JSON.parse(line);
+                            if (data.type === 'status') {
+                                removeTypingIndicator();
+                                appendMessage(data.text, false);
+                                showTypingIndicator();
+                            } else if (data.type === 'delta') {
+                                removeTypingIndicator();
+                                if (!activeAgentBubble) {
+                                    activeAgentBubble = createAgentPlaceholder();
+                                }
+                                activeAgentText += data.text;
+                                updateAgentBubble(activeAgentBubble, activeAgentText);
+                            } else if (data.type === 'done') {
+                                removeTypingIndicator();
+                                if (data.session_id) {
+                                    localStorage.setItem(SESSION_KEY, data.session_id);
+                                }
+                            } else if (data.type === 'error') {
+                                removeTypingIndicator();
+                                appendMessage(data.detail || 'An error occurred.', false);
+                            }
+                        } catch (e) {
+                            console.error('Error parsing line:', e, line);
+                        }
+                    }
                 }
             } catch (error) {
                 removeTypingIndicator();

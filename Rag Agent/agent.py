@@ -52,14 +52,15 @@ CRITICAL RULES:
 2. If answering a question requires more than 2 lines of information or news, you MUST give a very brief 1-line summary and ask the user if they need the extra details or not. 
 3. Only recall/refer to previous chat history if the user's current question is related to it. If they ask about something unrelated or change the topic, ignore the history and treat it as a fresh start.
 4. Your default/initial greeting must be: "Hi, how can I help you?"
-5. Whenever you decide to call a tool, you should include a small, short sentence explaining what you are doing (e.g., say "Let me check and verify..." before searching the knowledge base or checking calendar availability, and "I am booking a meeting for you..." before calling book_meeting). Do not rush things.
+5. Whenever you decide to call a tool, you should include a small, short sentence explaining what you are doing (e.g., say "Let me check and verify..." before searching the knowledge base, say "Let me check the calendar if our team is available at that moment..." before checking calendar availability, and "I am booking a meeting for you..." before calling book_meeting). Do not rush things.
 6. To book a meeting, you MUST obtain all of the following details from the user:
    - Their name
    - Their email
    - The preferred date and time
    - Their home address (ask the user for their address if you do not have it)
 7. Before calling `book_meeting`, you MUST call `check_calendar_availability` for the proposed date and time.
-8. Once you have their name, email, future date/time, and address, call `book_meeting` and pass the address to the `client_address` parameter. Do not call `update_lead_sheet` directly for a booked meeting."""
+8. Once you have their name, email, future date/time, and address, call `book_meeting` and pass the address to the `client_address` parameter. Do not call `update_lead_sheet` directly for a booked meeting.
+9. Do NOT use dashes (-), em-dashes (—), or double-hyphens (--) in your chat responses. Use commas, spaces, or periods instead."""
 
 
 def _load_retriever():
@@ -233,6 +234,111 @@ class RagAgent:
                 await memory.aset(pruned_messages)
 
         return str(response)
+
+    async def chat_stream(self, session_id: str, message: str):
+        """Send a message and stream status updates and response text chunks."""
+        ctx = self._get_context(session_id)
+        now = datetime.datetime.now(datetime.timezone.utc)
+        grounded_message = (
+            f"(System note, not visible to the user: the real current date/time is "
+            f"{now.strftime('%Y-%m-%d %H:%M UTC')}, {now.strftime('%A')}. Use this as ground truth "
+            "for any relative-date reasoning or meeting booking.)\n"
+            f"{message}"
+        )
+
+        from llama_index.core.agent.workflow import AgentStream, ToolCall
+        
+        handler = self._agent.run(user_msg=grounded_message, ctx=ctx)
+        
+        full_stream_text = ""
+        answer_started = False
+        answer_prefix = "Answer:"
+
+        async for event in handler.stream_events():
+            if isinstance(event, ToolCall):
+                tool_name = event.tool_name
+                if tool_name in ("check_calendar_availability", "get_existing_meeting"):
+                    yield {"type": "status", "text": "Let me check the calendar if our team is available at that moment..."}
+                elif tool_name == "book_meeting":
+                    yield {"type": "status", "text": "I am booking a meeting for you..."}
+                elif tool_name == "search_knowledge_base":
+                    yield {"type": "status", "text": "Let me check and verify..."}
+            elif isinstance(event, AgentStream):
+                if answer_started:
+                    clean_text = event.delta.replace("—", ", ").replace("--", ", ")
+                    if clean_text:
+                        yield {"type": "delta", "text": clean_text}
+                else:
+                    full_stream_text += event.delta
+                    if answer_prefix in full_stream_text:
+                        answer_started = True
+                        after_answer = full_stream_text.split(answer_prefix, 1)[1]
+                        clean_text = after_answer.replace("—", ", ").replace("--", ", ")
+                        if clean_text:
+                            yield {"type": "delta", "text": clean_text}
+
+        response = await handler
+
+        # Fallback: if we never detected the "Answer:" prefix in the stream, yield the final response now.
+        if not answer_started:
+            final_text = str(response)
+            if "Answer:" in final_text:
+                final_text = final_text.split("Answer:", 1)[1]
+            clean_text = final_text.replace("—", ", ").replace("--", ", ").strip()
+            if clean_text:
+                yield {"type": "delta", "text": clean_text}
+
+        # Prune memory to minimize token usage: strip verbose React reasoning steps,
+        # discard intermediate tool outputs, and clean previous user messages.
+        memory = await ctx.store.get("memory")
+        if memory:
+            messages = await memory.aget()
+            from llama_index.core.llms import TextBlock
+            
+            pruned_messages = []
+            modified = False
+            
+            for msg in messages:
+                role = getattr(msg.role, "value", msg.role)
+                
+                # Keep user messages, but strip the verbose system note prefix from past messages
+                if role == "user":
+                    content = msg.content or ""
+                    if "(System note," in content and ")\n" in content:
+                        parts = content.split(")\n", 1)
+                        if len(parts) > 1:
+                            msg.content = parts[1]
+                            modified = True
+                    pruned_messages.append(msg)
+                
+                # Keep assistant messages, but only keep the final clean Answer
+                elif role == "assistant":
+                    content = msg.content or ""
+                    if "Answer:" in content:
+                        final_answer = content.split("Answer:")[-1].strip()
+                        if final_answer and final_answer != content:
+                            msg.content = final_answer
+                            if hasattr(msg, "blocks") and msg.blocks:
+                                msg.blocks = [
+                                    TextBlock(text=final_answer) if isinstance(b, TextBlock) else b
+                                    for b in msg.blocks
+                                ]
+                            modified = True
+                    pruned_messages.append(msg)
+                
+                # Skip tool/system messages entirely for past turns
+                else:
+                    modified = True
+            
+            # Keep previous chat history small to reduce tokens (keep only last 4 messages / 2 turns)
+            if len(pruned_messages) > 4:
+                pruned_messages = pruned_messages[-4:]
+                modified = True
+            
+            if modified:
+                await memory.aset(pruned_messages)
+
+        yield {"type": "done", "session_id": session_id}
 
     def reset_session(self, session_id: str) -> None:
         with self._lock:

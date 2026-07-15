@@ -124,7 +124,7 @@ def update_lead_sheet(lead_id: str, name: str, email: str, calendar_id: str, mee
 
 def check_calendar_availability(date_time_iso: str, duration_minutes: int = 30) -> bool:
     """Checks if the user's primary calendar is free at the given ISO datetime."""
-    print("\nAgent: Let me check and verify...")
+    print("\nAgent: Let me check the calendar if our team is available at that moment...")
     cal_ok, cal_msg = check_google_calendar_access()
     if not cal_ok:
         raise RuntimeError(f"Google Calendar API is not available: {cal_msg}")
@@ -157,6 +157,7 @@ def check_calendar_availability(date_time_iso: str, duration_minutes: int = 30) 
 
 def get_existing_meeting(client_email: str) -> str:
     """Checks if a meeting already exists for this email."""
+    print("\nAgent: Let me check the calendar if our team is available at that moment...")
     cal_ok, cal_msg = check_google_calendar_access()
     if not cal_ok:
         raise RuntimeError(f"Google Calendar API is not available: {cal_msg}")
@@ -230,9 +231,27 @@ def book_meeting(client_name: str, client_email: str, date_time_iso: str, client
 
         end_time = start_time + datetime.timedelta(minutes=30)
 
+        # Build a professionally formatted meeting description for Google Calendar
+        formatted_meeting_time = start_time.strftime("%A, %B %d, %Y at %I:%M %p UTC")
+        calendar_description = (
+            "🏡 Remodeling Consultation Meeting\n"
+            "--------------------------------------------------\n"
+            "📋 LEAD DETAILS:\n"
+            f"  • Name: {client_name}\n"
+            f"  • Email: {client_email}\n"
+            f"  • Address: {client_address if client_address else 'Not provided'}\n"
+            f"  • Time: {formatted_meeting_time}\n"
+            "--------------------------------------------------\n"
+            "📝 DESCRIPTION:\n"
+            "Initial consultation to discuss home remodeling requirements, design "
+            "preferences, and project scope.\n\n"
+            "Apex Remodeling & Design\n"
+            "📞 Phone: +1 (800) 555-0199 | ✉️ info@apexremodeling.com"
+        )
+
         event = {
-            "summary": f"Meeting with {client_name}",
-            "description": "Consultation meeting.",
+            "summary": f"Apex Remodeling Consultation: {client_name}",
+            "description": calendar_description,
             "start": {
                 "dateTime": start_time.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 "timeZone": "UTC",
@@ -253,7 +272,7 @@ def book_meeting(client_name: str, client_email: str, date_time_iso: str, client
         event_id = event.get("id")
 
         # Send confirmation email
-        send_confirmation_email(client_name, client_email, date_time_iso)
+        send_confirmation_email(client_name, client_email, date_time_iso, client_address)
 
         # Record the lead in the Google Sheet automatically, so lead capture
         # never depends on the agent remembering to call update_lead_sheet.
@@ -291,32 +310,101 @@ def cancel_meeting(client_email: str) -> str:
         return f"Error canceling meeting: {e}"
 
 
-def send_confirmation_email(client_name: str, client_email: str, date_time_iso: str):
+def send_confirmation_email(client_name: str, client_email: str, date_time_iso: str, client_address: str = ""):
     """Sends a confirmation email using Gmail API."""
     try:
         creds = get_credentials(allow_interactive=False)
         service = build("gmail", "v1", credentials=creds)
 
-        message = EmailMessage()
-
         # Format the date nicely
         dt = datetime.datetime.fromisoformat(date_time_iso)
-        formatted_date = dt.strftime("%B %d, %Y at %I:%M %p")
+        formatted_date = dt.strftime("%A, %B %d, %Y at %I:%M %p")
 
-        content = f"""
-        Hi {client_name},
+        # Plain text version
+        plain_text_content = (
+            f"Dear {client_name},\n\n"
+            "Thank you for scheduling a consultation with Apex Remodeling & Design. "
+            "We are pleased to confirm your meeting. Below are the details of your "
+            "upcoming appointment:\n\n"
+            "📅 APPOINTMENT DETAILS:\n"
+            "--------------------------------------------------\n"
+            f"  • Appointment: Initial Consultation\n"
+            f"  • Date & Time: {formatted_date} (UTC)\n"
+            f"  • Location/Address: {client_address if client_address else 'Not provided'}\n"
+            "--------------------------------------------------\n\n"
+            "Our consultant will contact you at the scheduled time. If you need to make any "
+            "changes or reschedule, please reach out to us at least 24 hours in advance.\n\n"
+            "We look forward to speaking with you!\n\n"
+            "Best regards,\n"
+            "The Consultation Team\n"
+            "Apex Remodeling & Design\n\n"
+            "--------------------------------------------------\n"
+            "🏢 COMPANY CONTACT INFORMATION:\n"
+            "  📞 Phone: +1 (800) 555-0199\n"
+            "  ✉️ Email: info@apexremodeling.com\n"
+            "  📍 Address: 123 Main Street, Suite 400, Seattle, WA 98101\n"
+            "  ⏰ Office Hours: Mon - Fri, 9:00 AM - 5:00 PM\n"
+        )
 
-        Your meeting has been successfully booked for {formatted_date}.
-        We look forward to speaking with you!
+        # HTML version
+        html_content = f"""<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {{ font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #333333; line-height: 1.6; margin: 0; padding: 0; }}
+        .container {{ max-width: 600px; margin: 20px auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #ffffff; }}
+        .header {{ background-color: #2c3e50; padding: 25px; text-align: center; border-top-left-radius: 8px; border-top-right-radius: 8px; color: #ffffff; }}
+        .header h1 {{ margin: 0; font-size: 22px; font-weight: 400; letter-spacing: 0.5px; }}
+        .content {{ padding: 25px 20px; }}
+        .meeting-info {{ background-color: #f8f9fa; padding: 18px; border-left: 4px solid #3498db; margin: 20px 0; border-radius: 4px; }}
+        .meeting-info p {{ margin: 6px 0; font-size: 15px; }}
+        .footer {{ font-size: 12px; color: #7f8c8d; text-align: center; padding-top: 20px; border-top: 1px solid #e0e0e0; margin-top: 20px; line-height: 1.5; }}
+        .company-name {{ font-weight: bold; color: #2c3e50; font-size: 14px; margin-bottom: 5px; }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Apex Remodeling &amp; Design</h1>
+        </div>
+        <div class="content">
+            <p>Dear {client_name},</p>
+            <p>Thank you for scheduling a consultation with us. We are pleased to confirm that your meeting has been successfully booked. Below are the details of your upcoming consultation:</p>
+            
+            <div class="meeting-info">
+                <p><strong>Appointment:</strong> Initial Consultation</p>
+                <p><strong>Date &amp; Time:</strong> {formatted_date} (UTC)</p>
+                <p><strong>Location/Address:</strong> {client_address if client_address else 'Not provided'}</p>
+            </div>
+            
+            <p>Our consultant will contact you at the scheduled time. If you need to make any changes or reschedule, please feel free to reach out to us at least 24 hours in advance.</p>
+            
+            <p>We look forward to collaborating with you on your home remodeling project!</p>
+            
+            <p>Best regards,<br>
+            <strong>The Consultation Team</strong><br>
+            Apex Remodeling &amp; Design</p>
+        </div>
+        <div class="footer">
+            <p class="company-name">Apex Remodeling &amp; Design</p>
+            <p>Phone: +1 (800) 555-0199 &nbsp;|&nbsp; Email: info@apexremodeling.com<br>
+            Address: 123 Main Street, Suite 400, Seattle, WA 98101<br>
+            Office Hours: Mon - Fri, 9:00 AM - 5:00 PM</p>
+        </div>
+    </div>
+</body>
+</html>
+"""
 
-        Best regards,
-        The Team
-        """
-
-        message.set_content(content)
+        message = EmailMessage()
+        message["Subject"] = "Meeting Confirmation - Apex Remodeling & Design"
         message["To"] = client_email
         message["From"] = "me"
-        message["Subject"] = "Meeting Confirmation"
+
+        # Set the plain text version first
+        message.set_content(plain_text_content)
+        # Add the HTML version as an alternative
+        message.add_alternative(html_content, subtype="html")
 
         encoded_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
         create_message = {"raw": encoded_message}
