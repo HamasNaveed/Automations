@@ -107,7 +107,7 @@ class RagAgent:
         self._tool_update_sheet = FunctionTool.from_defaults(
             fn=google_services.update_lead_sheet,
             name="update_lead_sheet",
-            description="Updates the Google Sheet with lead information. Parameters: lead_id, name, email, calendar_id, meeting_date, address."
+            description="Use ONLY to save contact info if a lead shares details but does NOT book a meeting. NEVER call this tool for a booked meeting (book_meeting handles Sheets logging automatically)."
         )
         self._tool_check_availability = FunctionTool.from_defaults(
             fn=google_services.check_calendar_availability,
@@ -117,7 +117,7 @@ class RagAgent:
         self._tool_book_meeting = FunctionTool.from_defaults(
             fn=google_services.book_meeting,
             name="book_meeting",
-            description="Books a meeting and sends confirmation email. Checks if available and none exists for the user. Params: client_name, client_email, date_time_iso, client_address."
+            description="Use to book a consultation meeting. It automatically checks availability, creates the event on Google Calendar, sends a confirmation email to the user, and logs the lead in the Google Sheet. Params: client_name, client_email, date_time_iso, client_address."
         )
         self._tool_cancel_meeting = FunctionTool.from_defaults(
             fn=google_services.cancel_meeting,
