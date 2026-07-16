@@ -30,21 +30,21 @@ RANGE_NAME = "Sheet1!A:F"  # Columns A-F: ID, Name, Email, Calendar ID, Meeting 
 
 
 def _to_utc(dt: datetime.datetime) -> datetime.datetime:
-    """Normalizes a datetime to UTC-aware. Naive datetimes are assumed to already be UTC."""
+    """Normalizes a datetime to UTC-aware. Naive datetimes are assumed to be in local system timezone."""
     if dt.tzinfo is None:
-        return dt.replace(tzinfo=datetime.timezone.utc)
+        return dt.astimezone(datetime.timezone.utc)
     return dt.astimezone(datetime.timezone.utc)
 
 
 def get_current_datetime() -> str:
-    """Returns the real current date/time (UTC) and weekday name.
+    """Returns the real current date/time (local) and weekday name.
 
     The LLM has no reliable sense of "today" on its own (it can only guess
     from training data), so it must call this before interpreting relative
     dates like "tomorrow" or "next Monday", or before booking any meeting.
     """
-    now = datetime.datetime.now(datetime.timezone.utc)
-    return now.strftime("%Y-%m-%dT%H:%M:%SZ") + " UTC, " + now.strftime("%A, %B %d, %Y")
+    now = datetime.datetime.now().astimezone()
+    return now.strftime("%Y-%m-%dT%H:%M:%S%z") + " " + now.strftime("%Z, %A, %B %d, %Y")
 
 
 def get_credentials(allow_interactive: bool = False):

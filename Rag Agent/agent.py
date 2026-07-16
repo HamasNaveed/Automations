@@ -173,10 +173,10 @@ class RagAgent:
         correctly.
         """
         ctx = self._get_context(session_id)
-        now = datetime.datetime.now(datetime.timezone.utc)
+        now = datetime.datetime.now().astimezone()
         grounded_message = (
             f"(System note, not visible to the user: the real current date/time is "
-            f"{now.strftime('%Y-%m-%d %H:%M UTC')}, {now.strftime('%A')}. Use this as ground truth "
+            f"{now.strftime('%Y-%m-%d %H:%M %Z')}, {now.strftime('%A')}. Use this as ground truth "
             "for any relative-date reasoning or meeting booking.)\n"
             f"{message}"
         )
@@ -247,10 +247,10 @@ class RagAgent:
     async def chat_stream(self, session_id: str, message: str):
         """Send a message and stream status updates and response text chunks."""
         ctx = self._get_context(session_id)
-        now = datetime.datetime.now(datetime.timezone.utc)
+        now = datetime.datetime.now().astimezone()
         grounded_message = (
             f"(System note, not visible to the user: the real current date/time is "
-            f"{now.strftime('%Y-%m-%d %H:%M UTC')}, {now.strftime('%A')}. Use this as ground truth "
+            f"{now.strftime('%Y-%m-%d %H:%M %Z')}, {now.strftime('%A')}. Use this as ground truth "
             "for any relative-date reasoning or meeting booking.)\n"
             f"{message}"
         )
