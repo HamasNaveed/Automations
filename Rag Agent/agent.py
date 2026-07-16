@@ -26,7 +26,7 @@ import threading
 import chromadb
 from dotenv import load_dotenv
 from llama_index.core import VectorStoreIndex
-from llama_index.core.agent.workflow import ReActAgent
+from llama_index.core.agent.workflow import FunctionAgent
 from llama_index.core.tools import FunctionTool
 from llama_index.core.workflow import Context
 from llama_index.embeddings.google_genai import GoogleGenAIEmbedding
@@ -124,7 +124,7 @@ class RagAgent:
             name="cancel_meeting",
             description="Cancels an existing meeting for the given email. Params: client_email."
         )
-        self._agent = ReActAgent(
+        self._agent = FunctionAgent(
             tools=[
                 self._tool,
                 self._tool_current_datetime,
@@ -208,6 +208,16 @@ class RagAgent:
                 # Keep assistant messages, but only keep the final clean Answer
                 elif role == "assistant":
                     content = msg.content or ""
+                    if not content and hasattr(msg, "blocks") and msg.blocks:
+                        from llama_index.core.llms import TextBlock
+                        text_blocks = [b.text for b in msg.blocks if isinstance(b, TextBlock) and b.text]
+                        if text_blocks:
+                            content = " ".join(text_blocks)
+                            msg.content = content
+                        else:
+                            # Skip intermediate assistant messages with only tool calls
+                            modified = True
+                            continue
                     if "Answer:" in content:
                         final_answer = content.split("Answer:")[-1].strip()
                         if final_answer and final_answer != content:
@@ -249,10 +259,7 @@ class RagAgent:
         
         handler = self._agent.run(user_msg=grounded_message, ctx=ctx)
         
-        full_stream_text = ""
-        answer_started = False
-        answer_prefix = "Answer:"
-
+        streamed_any = False
         async for event in handler.stream_events():
             if isinstance(event, ToolCall):
                 tool_name = event.tool_name
@@ -263,26 +270,15 @@ class RagAgent:
                 elif tool_name == "search_knowledge_base":
                     pass
             elif isinstance(event, AgentStream):
-                if answer_started:
-                    clean_text = event.delta.replace("—", ", ").replace("--", ", ")
-                    if clean_text:
-                        yield {"type": "delta", "text": clean_text}
-                else:
-                    full_stream_text += event.delta
-                    if answer_prefix in full_stream_text:
-                        answer_started = True
-                        after_answer = full_stream_text.split(answer_prefix, 1)[1]
-                        clean_text = after_answer.replace("—", ", ").replace("--", ", ")
-                        if clean_text:
-                            yield {"type": "delta", "text": clean_text}
+                clean_text = event.delta.replace("—", ", ").replace("--", ", ")
+                if clean_text:
+                    streamed_any = True
+                    yield {"type": "delta", "text": clean_text}
 
         response = await handler
 
-        # Fallback: if we never detected the "Answer:" prefix in the stream, yield the final response now.
-        if not answer_started:
+        if not streamed_any:
             final_text = str(response)
-            if "Answer:" in final_text:
-                final_text = final_text.split("Answer:", 1)[1]
             clean_text = final_text.replace("—", ", ").replace("--", ", ").strip()
             if clean_text:
                 yield {"type": "delta", "text": clean_text}
@@ -313,6 +309,16 @@ class RagAgent:
                 # Keep assistant messages, but only keep the final clean Answer
                 elif role == "assistant":
                     content = msg.content or ""
+                    if not content and hasattr(msg, "blocks") and msg.blocks:
+                        from llama_index.core.llms import TextBlock
+                        text_blocks = [b.text for b in msg.blocks if isinstance(b, TextBlock) and b.text]
+                        if text_blocks:
+                            content = " ".join(text_blocks)
+                            msg.content = content
+                        else:
+                            # Skip intermediate assistant messages with only tool calls
+                            modified = True
+                            continue
                     if "Answer:" in content:
                         final_answer = content.split("Answer:")[-1].strip()
                         if final_answer and final_answer != content:
