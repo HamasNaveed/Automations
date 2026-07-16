@@ -84,7 +84,12 @@ async def chat(req: ChatRequest):
             traceback.print_exc()
             yield json.dumps({"type": "error", "detail": str(e)}) + "\n"
 
-    return StreamingResponse(event_generator(), media_type="application/x-ndjson")
+    headers = {
+        "Cache-Control": "no-cache",
+        "X-Content-Type-Options": "nosniff",
+        "Connection": "keep-alive",
+    }
+    return StreamingResponse(event_generator(), media_type="application/x-ndjson", headers=headers)
 
 
 @app.post("/api/reset")
