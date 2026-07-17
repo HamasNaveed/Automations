@@ -1,0 +1,12 @@
+chromadb
+llama-index
+llama-index-vector-stores-chroma
+llama-index-embeddings-google-genai
+llama-index-llms-gemini
+llama-index-llms-groq
+python-dotenv
+fastapi
+uvicorn[standard]
+google-api-python-client
+google-auth-httplib2
+google-auth-oauthlib
