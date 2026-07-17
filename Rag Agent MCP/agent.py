@@ -99,39 +99,17 @@ class RagAgent:
                 "Always call this before answering factual questions."
             ),
         )
-        self._tool_current_datetime = FunctionTool.from_defaults(
-            fn=google_services.get_current_datetime,
-            name="get_current_datetime",
-            description="Returns the real current date and time (UTC) and weekday name. Call this before interpreting any relative date (e.g. 'tomorrow', 'next week') or booking a meeting — never guess today's date."
-        )
-        self._tool_update_sheet = FunctionTool.from_defaults(
-            fn=google_services.update_lead_sheet,
-            name="update_lead_sheet",
-            description="Use ONLY to save contact info if a lead shares details but does NOT book a meeting. NEVER call this tool for a booked meeting (book_meeting handles Sheets logging automatically)."
-        )
-        self._tool_check_availability = FunctionTool.from_defaults(
-            fn=google_services.check_calendar_availability,
-            name="check_calendar_availability",
-            description="Checks if the user's calendar is free at the given ISO datetime string. Optional duration_minutes defaults to 30."
-        )
-        self._tool_book_meeting = FunctionTool.from_defaults(
-            fn=google_services.book_meeting,
-            name="book_meeting",
-            description="Use to book a consultation meeting. It automatically checks availability, creates the event on Google Calendar, sends a confirmation email to the user, and logs the lead in the Google Sheet. Params: client_name, client_email, date_time_iso, client_address."
-        )
-        self._tool_cancel_meeting = FunctionTool.from_defaults(
-            fn=google_services.cancel_meeting,
-            name="cancel_meeting",
-            description="Cancels an existing meeting for the given email. Params: client_email."
-        )
+        # Initialize Google Services via MCP Server
+        server_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "mcp_server.py")
+        from llama_index.tools.mcp import BasicMCPClient, McpToolSpec
+        self._mcp_client = BasicMCPClient("python", args=[server_path])
+        self._mcp_tool_spec = McpToolSpec(client=self._mcp_client)
+        mcp_tools = self._mcp_tool_spec.to_tool_list()
+
         self._agent = FunctionAgent(
             tools=[
                 self._tool,
-                self._tool_current_datetime,
-                self._tool_update_sheet,
-                self._tool_check_availability,
-                self._tool_book_meeting,
-                self._tool_cancel_meeting,
+                *mcp_tools
             ],
             llm=self._llm,
             system_prompt=SYSTEM_PROMPT,
