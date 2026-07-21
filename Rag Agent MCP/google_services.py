@@ -584,6 +584,9 @@ def escalate_ticket_to_human(ticket_id: str, reason: str = "Client requested sen
         return f"Error escalating ticket: {e}"
 
 
+EMERGENCY_EMAIL = os.getenv("EMERGENCY_EMAIL", "hamasnaveed123@gmail.com")
+
+
 def _send_ticket_email(client_email: str, client_name: str, ticket_id: str, priority: int, category: str, issue_description: str, is_escalated: str):
     """Sends confirmation email to user upon support ticket creation."""
     try:
@@ -591,24 +594,27 @@ def _send_ticket_email(client_email: str, client_name: str, ticket_id: str, prio
         service = build("gmail", "v1", credentials=creds)
 
         message = EmailMessage()
-        message["Subject"] = f"Support Ticket Received [{ticket_id}] - Apex Remodeling"
+        message["Subject"] = f"Support Ticket Confirmation [{ticket_id}] - Apex Remodeling"
         message["To"] = client_email
         message["From"] = "me"
 
         body_text = f"""Dear {client_name},
 
-We have logged your support request under Ticket ID: {ticket_id}.
+Thank you for reaching out to Apex Remodeling & Design.
+
+Your Ticket ID is {ticket_id} and our agent will get in contact with you for resolving the issue.
 
 Ticket Details:
 - Category: {category}
-- Priority: {priority}/10
-- Issue: {issue_description}
+- Priority Level: {priority}/10
+- Issue Description: {issue_description}
 - Status: Opened (Escalated: {is_escalated})
 
-Our team is reviewing your request. You can check the status at any time by asking our AI assistant or emailing us with your Ticket ID.
+You can check your ticket status at any time by asking our AI assistant or replying to this email.
 
 Best regards,
-Apex Remodeling & Design Support Team
+Support Team
+Apex Remodeling & Design
 """
         message.set_content(body_text)
         encoded_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
@@ -624,8 +630,8 @@ def _send_escalation_alert_email(client_name: str, client_email: str, ticket_id:
         service = build("gmail", "v1", credentials=creds)
 
         message = EmailMessage()
-        message["Subject"] = f"URGENT ESCALATION: Ticket {ticket_id} (Priority {priority}/10)"
-        message["To"] = client_email  # Sends notification
+        message["Subject"] = f"HIGH PRIORITY / ESCALATED SUPPORT TICKET ALERT - {ticket_id}"
+        message["To"] = EMERGENCY_EMAIL
         message["From"] = "me"
 
         body_text = f"""HIGH PRIORITY / ESCALATED SUPPORT TICKET ALERT
