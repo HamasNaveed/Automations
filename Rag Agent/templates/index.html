@@ -476,6 +476,14 @@
             pointer-events: all;
         }
 
+        /* Expanded / Larger Chat Mode */
+        .chat-overlay-box.expanded {
+            width: 680px;
+            height: 760px;
+            max-width: calc(100vw - 32px);
+            max-height: calc(100vh - 110px);
+        }
+
         /* Chat Header */
         .chat-header {
             padding: 16px 20px;
@@ -901,13 +909,18 @@
                     </div>
                 </div>
                 <div class="header-actions">
-                    <button class="btn-header" onclick="clearChat()">
+                    <button class="btn-header" id="btnExpandChat" onclick="toggleExpandChat()" title="Expand / Maximize Chat">
+                        <svg id="expandIcon" style="width: 15px; height: 15px; fill: currentColor;" viewBox="0 0 24 24">
+                            <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+                        </svg>
+                    </button>
+                    <button class="btn-header" onclick="clearChat()" title="Reset Conversation">
                         <svg style="width: 14px; height: 14px; fill: currentColor;" viewBox="0 0 24 24">
                             <path d="M19 4h-3.5l-1-1h-5l-1 1H5v2h14V4zM6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM8 9h8v10H8V9z"/>
                         </svg>
                         Reset
                     </button>
-                    <button class="btn-header" onclick="toggleChat(false)">
+                    <button class="btn-header" onclick="toggleChat(false)" title="Close Chat">
                         <svg style="width: 16px; height: 16px; fill: currentColor;" viewBox="0 0 24 24">
                             <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
                         </svg>
@@ -972,6 +985,19 @@
             }
             if (container.classList.contains('open')) {
                 setTimeout(() => document.getElementById('messageInput').focus(), 150);
+            }
+        }
+
+        // Toggle Maximize / Expand Chat Window Size
+        function toggleExpandChat() {
+            const box = document.getElementById('chatOverlayBox');
+            box.classList.toggle('expanded');
+            const isExpanded = box.classList.contains('expanded');
+            const icon = document.getElementById('expandIcon');
+            if (isExpanded) {
+                icon.innerHTML = `<path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/>`;
+            } else {
+                icon.innerHTML = `<path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>`;
             }
         }
 
