@@ -45,7 +45,7 @@ MODEL_NAME = os.environ.get("RAG_AGENT_MODEL", "models/gemini-3.1-flash-lite")
 TOP_K = 2
 SESSION_IDLE_LIMIT = 200  # safety cap so a long-running server can't leak memory forever
 
-SYSTEM_PROMPT = """You are a highly conversational, friendly, and human-like assistant for a home remodeling company.
+SYSTEM_PROMPT = """You are a highly conversational, friendly, and human-like assistant for Apex Remodeling & Design.
 
 CRITICAL RULES:
 1. Every message you output MUST be very concise, small, and a maximum of 2 lines. 
@@ -60,7 +60,21 @@ CRITICAL RULES:
    - Their home address (ask the user for their address if you do not have it)
 7. Before calling `book_meeting`, you MUST call `check_calendar_availability` for the proposed date and time.
 8. Once you have their name, email, future date/time, and address, call `book_meeting` and pass the address to the `client_address` parameter. Do not call `update_lead_sheet` directly for a booked meeting.
-9. Do NOT use dashes (-), em-dashes (—), or double-hyphens (--) in your chat responses. Use commas, spaces, or periods instead."""
+9. SUPPORT TICKET CREATION RULES:
+   - When a user reports an issue, complaint, craftsmanship defect, active hazard, billing dispute, or service request, offer to create a support ticket.
+   - You MUST obtain: client Name, Email, Location/Address, and Issue Description.
+   - Categorize the query: "Craftsmanship & Quality", "Emergency Hazard", "Billing & Invoice Dispute", "Schedule & PM Complaint", "Design Change Request", or "General Support".
+   - Assign Priority (1 to 10):
+     * 1 to 3: Low (minor questions, general inquiries, aesthetic preferences)
+     * 4 to 6: Medium (minor delays, invoice questions, small non-urgent fixes)
+     * 7 to 8: High (project manager disputes, major schedule delays, unaddressed defects)
+     * 9 to 10: Critical (active water leaks, electrical hazards, structural safety emergencies)
+   - Pass a concise 1-line summary of the conversation to `chat_summary` when calling `create_support_ticket`.
+   - Critical issues (Priority 8-10) are automatically escalated to a human senior manager by the tool.
+10. TICKET STATUS & HUMAN ESCALATION RULES:
+    - If a user asks to check support ticket status, ask for their Ticket ID (e.g. TICK-123456) or Email address and call `get_ticket_status`.
+    - If a user asks to speak to a human or escalate an existing ticket, call `escalate_ticket_to_human`.
+11. Do NOT use dashes (-), em-dashes (—), or double-hyphens (--) in your chat responses. Use commas, spaces, or periods instead."""
 
 
 def _load_retriever():
@@ -124,6 +138,21 @@ class RagAgent:
             name="cancel_meeting",
             description="Cancels an existing meeting for the given email. Params: client_email."
         )
+        self._tool_create_ticket = FunctionTool.from_defaults(
+            fn=google_services.create_support_ticket,
+            name="create_support_ticket",
+            description="Creates a support ticket in Google Sheets (Tickets tab), sends email confirmation, and auto-escalates if priority >= 8. Params: name, email, location, issue_description, priority, category, calendar_id, meeting_date, chat_summary."
+        )
+        self._tool_get_ticket_status = FunctionTool.from_defaults(
+            fn=google_services.get_ticket_status,
+            name="get_ticket_status",
+            description="Retrieves support ticket details and resolution status by Ticket ID (e.g. TICK-123456) or client Email. Params: identifier."
+        )
+        self._tool_escalate_ticket = FunctionTool.from_defaults(
+            fn=google_services.escalate_ticket_to_human,
+            name="escalate_ticket_to_human",
+            description="Escalates an existing support ticket to a human senior manager and dispatches an urgent alert email. Params: ticket_id, reason."
+        )
         self._agent = FunctionAgent(
             tools=[
                 self._tool,
@@ -132,6 +161,9 @@ class RagAgent:
                 self._tool_check_availability,
                 self._tool_book_meeting,
                 self._tool_cancel_meeting,
+                self._tool_create_ticket,
+                self._tool_get_ticket_status,
+                self._tool_escalate_ticket,
             ],
             llm=self._llm,
             system_prompt=SYSTEM_PROMPT,

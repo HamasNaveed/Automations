@@ -63,5 +63,41 @@ def cancel_meeting(client_email: str) -> str:
     """Cancels an existing meeting for the given email."""
     return google_services.cancel_meeting(client_email=client_email)
 
+@mcp.tool()
+def create_support_ticket(
+    name: str,
+    email: str,
+    location: str,
+    issue_description: str,
+    priority: int = 5,
+    category: str = "General Support",
+    calendar_id: str = "",
+    meeting_date: str = "",
+    chat_summary: str = ""
+) -> str:
+    """Creates a support ticket in Google Sheets (Tickets tab), sends email confirmation, and auto-escalates if priority >= 8."""
+    return google_services.create_support_ticket(
+        name=name,
+        email=email,
+        location=location,
+        issue_description=issue_description,
+        priority=priority,
+        category=category,
+        calendar_id=calendar_id,
+        meeting_date=meeting_date,
+        chat_summary=chat_summary
+    )
+
+@mcp.tool()
+def get_ticket_status(identifier: str) -> str:
+    """Retrieves support ticket details and resolution status by Ticket ID (e.g. TICK-123456) or client Email."""
+    return google_services.get_ticket_status(identifier=identifier)
+
+@mcp.tool()
+def escalate_ticket_to_human(ticket_id: str, reason: str = "Client requested human agent") -> str:
+    """Escalates an existing support ticket to a human senior manager and dispatches an urgent alert email."""
+    return google_services.escalate_ticket_to_human(ticket_id=ticket_id, reason=reason)
+
 if __name__ == "__main__":
     mcp.run()
+

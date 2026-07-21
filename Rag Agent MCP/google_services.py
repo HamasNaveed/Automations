@@ -27,6 +27,7 @@ CREDENTIALS_PATH = os.path.join(BASE_DIR, "credentials.json")
 # someone else's spreadsheet. Each deployment must point at its own sheet.
 SPREADSHEET_ID = os.getenv("SPREADSHEET_ID")
 RANGE_NAME = "Sheet1!A:F"  # Columns A-F: ID, Name, Email, Calendar ID, Meeting Date, Address
+TICKETS_RANGE_NAME = "Tickets!A:L"  # Columns A-L: Id, Name, Email, Calender ID, Date/Time, Location, Issue description, Priority(1-10), Resolved, Category, Escalated, Chat Summary
 
 
 def _to_utc(dt: datetime.datetime) -> datetime.datetime:
@@ -413,3 +414,238 @@ def send_confirmation_email(client_name: str, client_email: str, date_time_iso: 
 
     except Exception as e:
         print(f"Error sending email: {e}")
+
+
+def create_support_ticket(
+    name: str,
+    email: str,
+    location: str,
+    issue_description: str,
+    priority: int = 5,
+    category: str = "General Support",
+    calendar_id: str = "",
+    meeting_date: str = "",
+    chat_summary: str = ""
+) -> str:
+    """Creates a support ticket in the Google Sheet (Tickets tab) and triggers human escalation if high priority."""
+    sheet_ok, sheet_msg = check_google_sheets_access()
+    if not sheet_ok:
+        return f"Error: Cannot access Google Sheet. Details: {sheet_msg}"
+
+    try:
+        priority = max(1, min(10, int(priority)))
+        ticket_id = f"TICK-{uuid.uuid4().hex[:6].upper()}"
+        now_str = datetime.datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S")
+
+        # Auto-escalation condition for priority 8-10 or severe issues
+        is_escalated = "Yes" if priority >= 8 else "No"
+        resolved = "No"
+
+        creds = get_credentials(allow_interactive=False)
+        service = build("sheets", "v4", credentials=creds)
+
+        values = [[
+            ticket_id,
+            name,
+            email,
+            calendar_id,
+            now_str if not meeting_date else meeting_date,
+            location,
+            issue_description,
+            priority,
+            resolved,
+            category,
+            is_escalated,
+            chat_summary
+        ]]
+        body = {"values": values}
+
+        service.spreadsheets().values().append(
+            spreadsheetId=SPREADSHEET_ID,
+            range=TICKETS_RANGE_NAME,
+            valueInputOption="USER_ENTERED",
+            body=body
+        ).execute()
+
+        # Send confirmation email to client
+        _send_ticket_email(email, name, ticket_id, priority, category, issue_description, is_escalated)
+
+        # If escalated, send urgent notification to manager
+        if is_escalated == "Yes":
+            _send_escalation_alert_email(name, email, ticket_id, priority, category, issue_description, chat_summary)
+
+        res_msg = f"Support ticket created successfully! Ticket ID: {ticket_id} | Priority: {priority}/10 | Category: {category}."
+        if is_escalated == "Yes":
+            res_msg += " This high-priority issue has been automatically escalated to a senior manager."
+        return res_msg
+
+    except Exception as e:
+        return f"Error creating support ticket: {e}"
+
+
+def get_ticket_status(identifier: str) -> str:
+    """Retrieves ticket details by Ticket ID (e.g. TICK-123456) or client Email."""
+    sheet_ok, sheet_msg = check_google_sheets_access()
+    if not sheet_ok:
+        return f"Error: Cannot access Google Sheet. Details: {sheet_msg}"
+
+    try:
+        creds = get_credentials(allow_interactive=False)
+        service = build("sheets", "v4", credentials=creds)
+
+        result = service.spreadsheets().values().get(
+            spreadsheetId=SPREADSHEET_ID,
+            range=TICKETS_RANGE_NAME
+        ).execute()
+
+        rows = result.get("values", [])
+        if not rows:
+            return "No support tickets found in system."
+
+        query = identifier.strip().lower()
+        matches = []
+
+        for row in rows[1:]:  # Skip header row
+            if len(row) > 0:
+                t_id = row[0].strip().lower() if len(row) > 0 else ""
+                t_email = row[2].strip().lower() if len(row) > 2 else ""
+
+                if query == t_id or query == t_email or query in t_id:
+                    t_name = row[1] if len(row) > 1 else "N/A"
+                    t_date = row[4] if len(row) > 4 else "N/A"
+                    t_loc = row[5] if len(row) > 5 else "N/A"
+                    t_desc = row[6] if len(row) > 6 else "N/A"
+                    t_prio = row[7] if len(row) > 7 else "N/A"
+                    t_res = row[8] if len(row) > 8 else "N/A"
+                    t_cat = row[9] if len(row) > 9 else "N/A"
+                    t_esc = row[10] if len(row) > 10 else "N/A"
+
+                    matches.append(
+                        f"• Ticket ID: {row[0]}\n"
+                        f"  Date: {t_date}\n"
+                        f"  Category: {t_cat}\n"
+                        f"  Priority: {t_prio}/10\n"
+                        f"  Resolved: {t_res}\n"
+                        f"  Escalated to Human: {t_esc}\n"
+                        f"  Issue: {t_desc}"
+                    )
+
+        if not matches:
+            return f"No support ticket found matching '{identifier}'."
+
+        return "Found matching support ticket(s):\n\n" + "\n\n".join(matches)
+
+    except Exception as e:
+        return f"Error retrieving ticket status: {e}"
+
+
+def escalate_ticket_to_human(ticket_id: str, reason: str = "Client requested senior manager assistance") -> str:
+    """Escalates an existing ticket to a human manager."""
+    sheet_ok, sheet_msg = check_google_sheets_access()
+    if not sheet_ok:
+        return f"Error: Cannot access Google Sheet. Details: {sheet_msg}"
+
+    try:
+        creds = get_credentials(allow_interactive=False)
+        service = build("sheets", "v4", credentials=creds)
+
+        result = service.spreadsheets().values().get(
+            spreadsheetId=SPREADSHEET_ID,
+            range=TICKETS_RANGE_NAME
+        ).execute()
+
+        rows = result.get("values", [])
+        ticket_target = ticket_id.strip().upper()
+
+        for idx, row in enumerate(rows):
+            if len(row) > 0 and row[0].strip().upper() == ticket_target:
+                row_num = idx + 1  # 1-indexed line in sheets
+                # Update Escalated column (column K / index 11)
+                update_range = f"Tickets!K{row_num}"
+                service.spreadsheets().values().update(
+                    spreadsheetId=SPREADSHEET_ID,
+                    range=update_range,
+                    valueInputOption="USER_ENTERED",
+                    body={"values": [["Yes"]]}
+                ).execute()
+
+                c_name = row[1] if len(row) > 1 else "Client"
+                c_email = row[2] if len(row) > 2 else "Unknown"
+                c_desc = row[6] if len(row) > 6 else ""
+                c_prio = row[7] if len(row) > 7 else "8"
+                c_cat = row[9] if len(row) > 9 else "Support"
+
+                _send_escalation_alert_email(c_name, c_email, ticket_target, c_prio, c_cat, c_desc, reason)
+                return f"Ticket {ticket_target} has been successfully escalated to a senior manager."
+
+        return f"Ticket ID '{ticket_id}' not found."
+
+    except Exception as e:
+        return f"Error escalating ticket: {e}"
+
+
+def _send_ticket_email(client_email: str, client_name: str, ticket_id: str, priority: int, category: str, issue_description: str, is_escalated: str):
+    """Sends confirmation email to user upon support ticket creation."""
+    try:
+        creds = get_credentials(allow_interactive=False)
+        service = build("gmail", "v1", credentials=creds)
+
+        message = EmailMessage()
+        message["Subject"] = f"Support Ticket Received [{ticket_id}] - Apex Remodeling"
+        message["To"] = client_email
+        message["From"] = "me"
+
+        body_text = f"""Dear {client_name},
+
+We have logged your support request under Ticket ID: {ticket_id}.
+
+Ticket Details:
+- Category: {category}
+- Priority: {priority}/10
+- Issue: {issue_description}
+- Status: Opened (Escalated: {is_escalated})
+
+Our team is reviewing your request. You can check the status at any time by asking our AI assistant or emailing us with your Ticket ID.
+
+Best regards,
+Apex Remodeling & Design Support Team
+"""
+        message.set_content(body_text)
+        encoded_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
+        service.users().messages().send(userId="me", body={"raw": encoded_message}).execute()
+    except Exception as e:
+        print(f"Error sending ticket confirmation email: {e}")
+
+
+def _send_escalation_alert_email(client_name: str, client_email: str, ticket_id: str, priority: int, category: str, issue_description: str, chat_summary: str):
+    """Sends urgent alert email to support manager for escalated high-priority tickets."""
+    try:
+        creds = get_credentials(allow_interactive=False)
+        service = build("gmail", "v1", credentials=creds)
+
+        message = EmailMessage()
+        message["Subject"] = f"URGENT ESCALATION: Ticket {ticket_id} (Priority {priority}/10)"
+        message["To"] = client_email  # Sends notification
+        message["From"] = "me"
+
+        body_text = f"""HIGH PRIORITY / ESCALATED SUPPORT TICKET ALERT
+
+Ticket ID: {ticket_id}
+Client Name: {client_name}
+Client Email: {client_email}
+Category: {category}
+Priority Level: {priority}/10
+
+Issue Summary:
+{issue_description}
+
+Chat Context / Summary:
+{chat_summary}
+
+Please contact the client immediately to resolve this escalated issue.
+"""
+        message.set_content(body_text)
+        encoded_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
+        service.users().messages().send(userId="me", body={"raw": encoded_message}).execute()
+    except Exception as e:
+        print(f"Error sending escalation email: {e}")
