@@ -299,6 +299,10 @@ class RagAgent:
                     yield {"type": "status", "text": "Let me check the calendar if our team is available at that moment..."}
                 elif tool_name == "book_meeting":
                     yield {"type": "status", "text": "I am booking a meeting for you..."}
+                elif tool_name == "create_support_ticket":
+                    yield {"type": "status", "text": "Let me store your ticket and send you details..."}
+                elif tool_name in ("get_ticket_status", "escalate_ticket_to_human"):
+                    yield {"type": "status", "text": "Let me check your support ticket status..."}
                 elif tool_name == "search_knowledge_base":
                     pass
             elif isinstance(event, AgentStream):

@@ -428,6 +428,7 @@ def create_support_ticket(
     chat_summary: str = ""
 ) -> str:
     """Creates a support ticket in the Google Sheet (Tickets tab) and triggers human escalation if high priority."""
+    print("\nAgent: Let me store your ticket and send you details...")
     sheet_ok, sheet_msg = check_google_sheets_access()
     if not sheet_ok:
         return f"Error: Cannot access Google Sheet. Details: {sheet_msg}"
