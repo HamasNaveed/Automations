@@ -589,39 +589,81 @@ EMERGENCY_EMAIL = os.getenv("EMERGENCY_EMAIL", "hamasnaveed123@gmail.com")
 
 
 def _send_ticket_email(client_email: str, client_name: str, ticket_id: str, priority: int, category: str, issue_description: str, is_escalated: str):
-    """Sends confirmation email to user upon support ticket creation."""
+    """Sends confirmation HTML email to user upon support ticket creation."""
     try:
         creds = get_credentials(allow_interactive=False)
         service = build("gmail", "v1", credentials=creds)
+
+        plain_text_content = (
+            f"Dear {client_name},\n\n"
+            f"Thank you for reaching out to Apex Remodeling & Design.\n"
+            f"Your Ticket ID is {ticket_id}.\n\n"
+            f"Category: {category}\n"
+            f"Issue: {issue_description}\n\n"
+            f"Our team will review your ticket and get back to you within 48 hours.\n\n"
+            f"Best regards,\nThe Support Team\nApex Remodeling & Design"
+        )
+
+        html_content = f"""<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {{ font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #333333; line-height: 1.6; margin: 0; padding: 0; }}
+        .container {{ max-width: 600px; margin: 20px auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #ffffff; }}
+        .header {{ background-color: #2c3e50; padding: 25px; text-align: center; border-top-left-radius: 8px; border-top-right-radius: 8px; color: #ffffff; }}
+        .header h1 {{ margin: 0; font-size: 22px; font-weight: 400; letter-spacing: 0.5px; }}
+        .content {{ padding: 25px 20px; }}
+        .info-box {{ background-color: #f8f9fa; padding: 18px; border-left: 4px solid #3498db; margin: 20px 0; border-radius: 4px; }}
+        .info-box p {{ margin: 6px 0; font-size: 15px; }}
+        .footer {{ font-size: 12px; color: #7f8c8d; text-align: center; padding-top: 20px; border-top: 1px solid #e0e0e0; margin-top: 20px; line-height: 1.5; }}
+        .company-name {{ font-weight: bold; color: #2c3e50; font-size: 14px; margin-bottom: 5px; }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Apex Remodeling &amp; Design</h1>
+        </div>
+        <div class="content">
+            <p>Dear {client_name},</p>
+            <p>Thank you for reaching out to Apex Remodeling &amp; Design. We have received your support request and created a ticket for you.</p>
+            
+            <div class="info-box">
+                <p><strong>Ticket ID:</strong> {ticket_id}</p>
+                <p><strong>Category:</strong> {category}</p>
+                <p><strong>Issue Summary:</strong> {issue_description}</p>
+            </div>
+            
+            <p>Our team will review your ticket and get back to you within 48 hours. You can check the status of your ticket at any time by speaking with our AI assistant using your Ticket ID.</p>
+            
+            <p>Best regards,<br>
+            <strong>The Support Team</strong><br>
+            Apex Remodeling &amp; Design</p>
+        </div>
+        <div class="footer">
+            <p class="company-name">Apex Remodeling &amp; Design</p>
+            <p>Phone: +1 (800) 555-0199 &nbsp;|&nbsp; Email: info@apexremodeling.com<br>
+            Address: 123 Main Street, Suite 400, Seattle, WA 98101<br>
+            Office Hours: Mon - Fri, 9:00 AM - 5:00 PM</p>
+        </div>
+    </div>
+</body>
+</html>
+"""
 
         message = EmailMessage()
         message["Subject"] = f"Support Ticket Confirmation [{ticket_id}] - Apex Remodeling"
         message["To"] = client_email
         message["From"] = "me"
 
-        body_text = f"""Dear {client_name},
+        message.set_content(plain_text_content)
+        message.add_alternative(html_content, subtype="html")
 
-Thank you for reaching out to Apex Remodeling & Design.
-
-Your Ticket ID is {ticket_id} and our agent will get in contact with you for resolving the issue.
-
-Ticket Details:
-- Category: {category}
-- Priority Level: {priority}/10
-- Issue Description: {issue_description}
-- Status: Opened (Escalated: {is_escalated})
-
-You can check your ticket status at any time by asking our AI assistant or replying to this email.
-
-Best regards,
-Support Team
-Apex Remodeling & Design
-"""
-        message.set_content(body_text)
         encoded_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
         service.users().messages().send(userId="me", body={"raw": encoded_message}).execute()
     except Exception as e:
         print(f"Error sending ticket confirmation email: {e}")
+
 
 
 def _send_escalation_alert_email(client_name: str, client_email: str, ticket_id: str, priority: int, category: str, issue_description: str, chat_summary: str):
