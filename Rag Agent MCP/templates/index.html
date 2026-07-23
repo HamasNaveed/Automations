@@ -1083,10 +1083,18 @@
             if (indicator) indicator.remove();
         }
 
+        let isSubmitting = false;
+
         async function handleSendMessage(event) {
             event.preventDefault();
+            if (isSubmitting) return;
             const message = messageInput.value.trim();
             if (!message) return;
+
+            isSubmitting = true;
+            messageInput.disabled = true;
+            const sendBtn = document.querySelector('.btn-send');
+            if (sendBtn) sendBtn.disabled = true;
 
             messageInput.value = '';
             appendMessage(message, true);
@@ -1178,6 +1186,11 @@
                 removeTypingIndicator();
                 appendMessage('Failed to connect to server. Please ensure the backend is running.', false);
                 console.error('Chat error:', error);
+            } finally {
+                isSubmitting = false;
+                messageInput.disabled = false;
+                if (sendBtn) sendBtn.disabled = false;
+                messageInput.focus();
             }
         }
 
