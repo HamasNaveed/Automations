@@ -27,7 +27,7 @@ CREDENTIALS_PATH = os.path.join(BASE_DIR, "credentials.json")
 # someone else's spreadsheet. Each deployment must point at its own sheet.
 SPREADSHEET_ID = os.getenv("SPREADSHEET_ID")
 RANGE_NAME = "Sheet1!A:F"  # Columns A-F: ID, Name, Email, Calendar ID, Meeting Date, Address
-TICKETS_RANGE_NAME = "Tickets!A:L"  # Columns A-L: Id, Name, Email, Calender ID, Date/Time, Location, Issue description, Priority(1-10), Resolved, Category, Escalated, Chat Summary
+TICKETS_RANGE_NAME = "Tickets!A:M"  # Columns A-M: Id, Name, Email, Calender ID, Date/Time, Location, Issue description, Priority(1-10), Resolved, Category, Escalated, Chat Summary, Order Number
 
 
 def _to_utc(dt: datetime.datetime) -> datetime.datetime:
@@ -425,7 +425,8 @@ def create_support_ticket(
     category: str = "General Support",
     calendar_id: str = "",
     meeting_date: str = "",
-    chat_summary: str = ""
+    chat_summary: str = "",
+    order_number: str = ""
 ) -> str:
     """Creates a support ticket in the Google Sheet (Tickets tab) and triggers human escalation if high priority."""
     print("\nAgent: Let me store your ticket and send you details...")
@@ -457,7 +458,8 @@ def create_support_ticket(
             resolved,
             category,
             is_escalated,
-            chat_summary
+            chat_summary,
+            order_number
         ]]
         body = {"values": values}
 
@@ -475,13 +477,12 @@ def create_support_ticket(
         if is_escalated == "Yes":
             _send_escalation_alert_email(name, email, ticket_id, priority, category, issue_description, chat_summary)
 
-        res_msg = f"Support ticket created successfully! Ticket ID: {ticket_id} | Priority: {priority}/10 | Category: {category}."
-        if is_escalated == "Yes":
-            res_msg += " This high-priority issue has been automatically escalated to a senior manager."
+        res_msg = f"Support ticket created successfully! Ticket ID: {ticket_id}."
         return res_msg
 
     except Exception as e:
         return f"Error creating support ticket: {e}"
+
 
 
 def get_ticket_status(identifier: str) -> str:

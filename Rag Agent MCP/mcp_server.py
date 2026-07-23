@@ -73,7 +73,8 @@ def create_support_ticket(
     category: str = "General Support",
     calendar_id: str = "",
     meeting_date: str = "",
-    chat_summary: str = ""
+    chat_summary: str = "",
+    order_number: str = ""
 ) -> str:
     """Creates a support ticket in Google Sheets (Tickets tab), sends email confirmation, and auto-escalates if priority >= 8."""
     return google_services.create_support_ticket(
@@ -85,8 +86,10 @@ def create_support_ticket(
         category=category,
         calendar_id=calendar_id,
         meeting_date=meeting_date,
-        chat_summary=chat_summary
+        chat_summary=chat_summary,
+        order_number=order_number
     )
+
 
 @mcp.tool()
 def get_ticket_status(identifier: str) -> str:
