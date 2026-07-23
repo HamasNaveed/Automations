@@ -118,7 +118,8 @@ class RagAgent:
             )
 
         from llama_index.tools.mcp import BasicMCPClient, McpToolSpec
-        mcp_client = BasicMCPClient("python", args=[SERVER_SCRIPT_PATH])
+        server_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "mcp_server.py")
+        mcp_client = BasicMCPClient("python", args=[server_path])
         mcp_tools = McpToolSpec(client=mcp_client).to_tool_list()
 
         self._retriever = _load_retriever()
